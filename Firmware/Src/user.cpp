@@ -122,11 +122,7 @@ namespace led
 
     void set_enabled(bool enabled)
     {
-        uint32_t bits = ENABLE_Pin;
-        if(enabled) {
-            bits <<= 16;
-        }
-        GPIOA->BSRR = bits;
+        GPIOA->BSRR = ENABLE_Pin << (int(enabled) << 4);
     }
 
 };    // namespace led
