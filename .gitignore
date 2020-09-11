@@ -3,3 +3,4 @@ __Previews/
 Firmware/MDK-ARM/Firmware/
 Firmware/MDK-ARM/Firmware.uvguix.chs
 Logs/
+*.REP
