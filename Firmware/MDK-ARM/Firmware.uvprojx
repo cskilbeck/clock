@@ -423,6 +423,11 @@
               <FileType>1</FileType>
               <FilePath>../Src/stm32f0xx_hal_msp.c</FilePath>
             </File>
+            <File>
+              <FileName>stm32f0xx_hal_conf.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Inc\stm32f0xx_hal_conf.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
