@@ -1,17 +1,19 @@
 #include "main.h"
 
 // #define CLK_Pin GPIO_PIN_5
-// #define CLK_GPIO_Port GPIOA
 // #define ENABLE_Pin GPIO_PIN_6
-// #define ENABLE_GPIO_Port GPIOA
 // #define MOSI_Pin GPIO_PIN_7
-// #define MOSI_GPIO_Port GPIOA
-// #define LATCH_Pin GPIO_PIN_9
-// #define LATCH_GPIO_Port GPIOA
+// #define LATCH_Pin GPIO_PIN_3
 
-#define LATCH_Pin_Position 9
+#define LATCH_Pin_Position 3
 #define MOSI_Pin_Position 7
 #define CLK_Pin_Position 5
+
+typedef struct packet_t
+{
+    uint64_t time;
+    uint64_t flags;
+} packet_t;
 
 namespace led
 {
@@ -124,13 +126,49 @@ namespace led
     {
         GPIOA->BSRR = ENABLE_Pin << (int(enabled) << 4);
     }
+    
+    void set_column(int column)
+    {
+        GPIOA->BSRR = (column & 7) | (7 << 16);
+    }
 
 };    // namespace led
+
+uint8_t buffers[2][16];
+int current_buffer_id = 0;  // which one has the most recent completed read in it
+volatile int read_complete = 0;
+
+extern "C" void i2c_read_complete(I2C_HandleTypeDef *hi2c)
+{
+    HAL_I2C_Slave_Receive_DMA(&hi2c1, buffers[current_buffer_id], 16);
+    current_buffer_id = 1 - current_buffer_id;
+    read_complete = 1;
+}
+
+extern "C" void i2c_listen_complete(I2C_HandleTypeDef *hi2c)
+{
+}
+
+extern "C" void i2c_error(I2C_HandleTypeDef *hi2c)
+{
+}
+
+uint16_t scale(uint8_t v)
+{
+    //uint32_t x = (v * 4112U) >> 8;  // scale 0..255 -> 0..4095
+    //return (uint16_t)((((x * x) >> 12) * x) >> 12);   // ghetto gamma ramp (cube it)
+    return v << 4;
+}
+
+int frames = 0;
 
 extern "C" void user_main(void)
 {
     // disable systick
     SysTick->CTRL = ~SysTick_CTRL_ENABLE_Msk;
+
+    // leds off to start with
+    led::set_enabled(false);
 
     // start led pwm timer
     HAL_TIM_PWM_Start(&htim14, TIM_CHANNEL_1);
@@ -150,41 +188,50 @@ extern "C" void user_main(void)
     }
     reg[15] = led::Global_latch;
 
+    HAL_I2C_RegisterCallback(&hi2c1, HAL_I2C_SLAVE_RX_COMPLETE_CB_ID, i2c_read_complete);
+    //HAL_I2C_RegisterCallback(&hi2c1, HAL_I2C_LISTEN_COMPLETE_CB_ID, i2c_listen_complete);
+    //HAL_I2C_RegisterCallback(&hi2c1, HAL_I2C_ERROR_CB_ID, i2c_error);
+
+    current_buffer_id = 0;    
+    HAL_I2C_Slave_Receive_DMA(&hi2c1, buffers[1 - current_buffer_id], 16);
+    
+    packet_t packet;
+
     while(1) {
 
-        int c[2];
-        int b2 = 4095 - b;
-
-        // cube for gamma
-        c[0] = (((b * b) >> 12) * b) >> 12;
-        c[1] = (((b2 * b2) >> 12) * b2) >> 12;
-
-        // set the led intensities
-        GPIOA->BSRR = 1 << 10;
-        int i;
-        for(i = 0; i < 15; ++i) {
-            led::set(c[i & 1], reg[i]);
+        if(read_complete) {
+            read_complete = 0;
+            memcpy(&packet, buffers[current_buffer_id], 16);
         }
-        // global output disable while we switch to the new column
-        led::set_enabled(false);
-
-        led::set(c[i & 1], reg[i]);
-        GPIOA->BSRR = 1 << (10 + 16);
-
+        
+        int32_t x = (int32_t)packet.time;
+        
+        // set the led intensities
+        for(int i = 0; i < 16; ++i) {
+            if(i == 15) {
+                // global output disable while we switch to the new column
+                led::set_enabled(false);
+            }
+            int32_t q = x;
+            if(q > 4095) {
+                q = 4095;
+            }
+            led::set(q, reg[i]);
+            x -= 4096;
+            if(x <= 0) {
+                x = 0;
+            }
+        }
         // set column here
+        led::set_column(4);//((frames & 31) > 15) ? 3 : 4);
 
         // global output enable the next column
         led::set_enabled(true);
-
-        // brightness function
-        b += vel;
-        if(b < 0 || b > 4095) {
-            vel = -vel;
-            b += vel;
-        }
-
+        
         // waitvb
         for(volatile int i = 0; i < 1000; ++i) {
         }
+        
+        frames += 1;
     }
 }

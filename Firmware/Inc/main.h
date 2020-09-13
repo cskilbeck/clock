@@ -33,9 +33,6 @@ extern "C" {
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "user.h"
-    
-extern TIM_HandleTypeDef htim14;
-
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -69,16 +66,14 @@ void Error_Handler(void);
 #define COL1_GPIO_Port GPIOA
 #define COL2_Pin GPIO_PIN_2
 #define COL2_GPIO_Port GPIOA
+#define LATCH_Pin GPIO_PIN_3
+#define LATCH_GPIO_Port GPIOA
 #define CLK_Pin GPIO_PIN_5
 #define CLK_GPIO_Port GPIOA
 #define ENABLE_Pin GPIO_PIN_6
 #define ENABLE_GPIO_Port GPIOA
 #define MOSI_Pin GPIO_PIN_7
 #define MOSI_GPIO_Port GPIOA
-#define LATCH_Pin GPIO_PIN_9
-#define LATCH_GPIO_Port GPIOA
-#define DEBUG_Pin GPIO_PIN_10
-#define DEBUG_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
