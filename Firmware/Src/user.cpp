@@ -155,9 +155,9 @@ extern "C" void i2c_error(I2C_HandleTypeDef *hi2c)
 
 uint16_t scale(uint8_t v)
 {
-    //uint32_t x = (v * 4112U) >> 8;  // scale 0..255 -> 0..4095
-    //return (uint16_t)((((x * x) >> 12) * x) >> 12);   // ghetto gamma ramp (cube it)
-    return v << 4;
+    uint32_t x = (v * 4112U) >> 8;  // scale 0..255 -> 0..4095
+    return (uint16_t)((((x * x) >> 12) * x) >> 12);   // ghetto gamma ramp (cube it)
+    //return v << 4;
 }
 
 int frames = 0;
@@ -223,7 +223,7 @@ extern "C" void user_main(void)
             }
         }
         // set column here
-        led::set_column(4);//((frames & 31) > 15) ? 3 : 4);
+        led::set_column(3);//((frames & 31) > 15) ? 3 : 4);
 
         // global output enable the next column
         led::set_enabled(true);
