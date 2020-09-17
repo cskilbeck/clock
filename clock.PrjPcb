@@ -75,7 +75,7 @@ DocumentUniqueId=KDGMOGEH
 DocumentPath=display.SchDoc
 AnnotationEnabled=1
 AnnotateStartValue=1
-AnnotationIndexControlEnabled=0
+AnnotationIndexControlEnabled=1
 AnnotateSuffix=
 AnnotateScope=All
 AnnotateOrder=0
@@ -92,7 +92,7 @@ DocumentUniqueId=WWWMITRY
 DocumentPath=clock.SchDoc
 AnnotationEnabled=1
 AnnotateStartValue=1
-AnnotationIndexControlEnabled=0
+AnnotationIndexControlEnabled=1
 AnnotateSuffix=
 AnnotateScope=All
 AnnotateOrder=1
@@ -1128,7 +1128,7 @@ GlobalIndexSortLocation=0
 
 [PrjClassGen]
 CompClassManualEnabled=1
-CompClassManualRoomEnabled=0
+CompClassManualRoomEnabled=1
 NetClassAutoBusEnabled=1
 NetClassAutoCompEnabled=0
 NetClassAutoNamedHarnessEnabled=0
