@@ -1,0 +1,24 @@
+----------------------------------------------------------------------------------------------------------------------------------
+NCDrill File Report For: clock.PcbDoc   30/09/2020  10:26:45
+----------------------------------------------------------------------------------------------------------------------------------
+
+Layer Pair : Top Copper to Bottom Copper
+ASCII Plated RoundHoles File : clock-RoundHoles-Plated.TXT
+ASCII Non-Plated RoundHoles File : clock-RoundHoles-NonPlated.TXT
+ASCII Plated SlotHoles File : clock-SlotHoles-Plated.TXT
+
+Tool       Hole Size               Hole Tolerance               Hole Type       Hole Count   Plated         Tool Travel
+----------------------------------------------------------------------------------------------------------------------------------
+T1      8mil (0.201mm)                                            Round             224       PTH        0.00inch (0.00mm)
+T2      12mil (0.3mm)                                             Round             14        PTH        0.00inch (0.00mm)
+T3      20mil (0.5mm)                                             Round             59        PTH        0.00inch (0.00mm)
+T4      20mil (0.5mm)                                             Slot              3         PTH        0.00inch (0.00mm)
+T5      32mil (0.8mm)                                             Round             8         PTH        0.00inch (0.00mm)
+T6      39mil (1.001mm)                                           Round             7         PTH        0.00inch (0.00mm)
+T7      49mil (1.25mm)                                            Round             1         PTH        0.00inch (0.00mm)
+T8      118mil (3mm)                                              Round             2         PTH        0.00inch (0.00mm)
+T9      28mil (0.701mm)                                           Round             4         NPTH       0.00inch (0.00mm)
+----------------------------------------------------------------------------------------------------------------------------------
+Totals                                                                              322
+
+Total Processing Time (hh:mm:ss) : 00:00:00
