@@ -1,6 +1,10 @@
 History/
 __Previews/
 Firmware/MDK-ARM/Firmware/
+Firmware3/MDK-ARM/Firmware3/
 Firmware/MDK-ARM/Firmware.uvguix.chs
+Firmware3/MDK-ARM/Firmware3.uvguix.chs
+Firmware3/MDK-ARM/*.lst
 Logs/
 *.REP
+"Outputs/Status Report.Txt"
