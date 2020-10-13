@@ -44,14 +44,14 @@ void led_set(byte *data, int bit, int val)
 
 void led_data_init()
 {
-//    buffer = 0;
-//    frames = 0;
-//    vblank = 0;
+    buffer = 0;
+    frames = 0;
+    vblank = 0;
 
-//    memset(spi_data, 0, sizeof(spi_data));
-//    memset(brightness, 0, sizeof(brightness));
-//    memset(config0, 0, 25);
-//    memset(config1, 0, 25);
+    memset(spi_data, 0, sizeof(spi_data));
+    memset(brightness, 0, sizeof(brightness));
+    memset(config0, 0, 25);
+    memset(config1, 0, 25);
 
     // pointers into the spi data for the dma handler
     for(int i=0; i<2; ++i) {
@@ -183,21 +183,50 @@ extern "C" void user_main()
     TIM17->DIER |= TIM_DIER_UIE;
     TIM17->CR1 |= TIM_CR1_CEN;
 	
+    LL_ADC_StartCalibration(ADC1);
+    while(LL_ADC_IsCalibrationOnGoing(ADC1)) {
+    }
+
+    LL_ADC_Enable(ADC1);
+
+    uint32 ambient = 0;
+    uint32 ambient_target = 0;
+    
     uint32 b = 0;
     while(1) {
         GPO_DEBUG_LED_GPIO_Port->BSRR = GPO_DEBUG_LED_Pin;
+        
+        LL_ADC_REG_StartConversion(ADC1);
+        
         while(vblank == 0) {
             __WFI();
         }
+
+        while(LL_ADC_REG_IsConversionOngoing(ADC1) != 0) {
+        }
+
+        LL_ADC_ClearFlag_EOC(ADC1);
+
+        int x = LL_ADC_REG_ReadConversionData12(ADC1);
+        
         vblank = 0;
         frames += 1;
         GPO_DEBUG_LED_GPIO_Port->BSRR = GPO_DEBUG_LED_Pin << 16;
 
         b = (b + 8) & 65535;
         
-        b = (b * b) >> 16;
+        //uint32 c = (b * b) >> (16 + 6);
         
-        uint32 c = b >> 6;
+        int c = (x - 0x300);
+        if(c < 0) {
+            c = 0;
+        }
+        if(c > 4095) {
+            c = 4095;
+        }
+        
+        ambient_target += (ambient_target - c) >> 4;
+        c = ambient_target >> 4;
 
         for(int i=0; i<128; ++i) {
             brightness[i] = c;

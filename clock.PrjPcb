@@ -1127,12 +1127,12 @@ GlobalIndexSortOrder=3
 GlobalIndexSortLocation=0
 
 [PrjClassGen]
-CompClassManualEnabled=0
-CompClassManualRoomEnabled=1
+CompClassManualEnabled=1
+CompClassManualRoomEnabled=0
 NetClassAutoBusEnabled=1
 NetClassAutoCompEnabled=0
 NetClassAutoNamedHarnessEnabled=0
-NetClassManualEnabled=1
+NetClassManualEnabled=0
 NetClassSeparateForBusSections=0
 
 [LibraryUpdateOptions]
@@ -1199,22 +1199,30 @@ Net16=NetName=COL5|NetColor=$00B8E61A
 Net17=NetName=COL6|NetColor=$00B8E61A
 Net18=NetName=COL7|NetColor=$00B8E61A
 Net19=NetName=GND|NetColor=$006EFF6E
-Net20=NetName=ROW00|NetColor=$000078F7
-Net21=NetName=ROW01|NetColor=$000078F7
-Net22=NetName=ROW02|NetColor=$000078F7
-Net23=NetName=ROW03|NetColor=$000078F7
-Net24=NetName=ROW04|NetColor=$000078F7
-Net25=NetName=ROW05|NetColor=$000078F7
-Net26=NetName=ROW06|NetColor=$000078F7
-Net27=NetName=ROW07|NetColor=$000078F7
-Net28=NetName=ROW08|NetColor=$000078F7
-Net29=NetName=ROW09|NetColor=$000078F7
-Net30=NetName=ROW10|NetColor=$000078F7
-Net31=NetName=ROW11|NetColor=$000078F7
-Net32=NetName=ROW12|NetColor=$000078F7
-Net33=NetName=ROW13|NetColor=$000078F7
-Net34=NetName=ROW14|NetColor=$000078F7
-Net35=NetName=ROW15|NetColor=$000078F7
+Net20=NetName=PF0|NetColor=$008133DB
+Net21=NetName=PF1|NetColor=$008133DB
+Net22=NetName=PF2|NetColor=$008133DB
+Net23=NetName=PF3|NetColor=$008133DB
+Net24=NetName=PF4|NetColor=$008133DB
+Net25=NetName=PF5|NetColor=$008133DB
+Net26=NetName=PF6|NetColor=$008133DB
+Net27=NetName=PF7|NetColor=$008133DB
+Net28=NetName=ROW00|NetColor=$000078F7
+Net29=NetName=ROW01|NetColor=$000078F7
+Net30=NetName=ROW02|NetColor=$000078F7
+Net31=NetName=ROW03|NetColor=$000078F7
+Net32=NetName=ROW04|NetColor=$000078F7
+Net33=NetName=ROW05|NetColor=$000078F7
+Net34=NetName=ROW06|NetColor=$000078F7
+Net35=NetName=ROW07|NetColor=$000078F7
+Net36=NetName=ROW08|NetColor=$000078F7
+Net37=NetName=ROW09|NetColor=$000078F7
+Net38=NetName=ROW10|NetColor=$000078F7
+Net39=NetName=ROW11|NetColor=$000078F7
+Net40=NetName=ROW12|NetColor=$000078F7
+Net41=NetName=ROW13|NetColor=$000078F7
+Net42=NetName=ROW14|NetColor=$000078F7
+Net43=NetName=ROW15|NetColor=$000078F7
 
 [Comparison Options]
 ComparisonOptions0=Kind=Net|MinPercent=75|MinMatch=3|ShowMatch=0|Confirm=0|UseName=-1|InclAllRules=0
