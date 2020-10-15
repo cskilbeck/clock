@@ -10,6 +10,8 @@ struct spi_packet
 
 #define TLC_SETCONFIG 192
 
+#define TLC_BRIGHTNESS0 112
+#define TLC_BRIGHTNESS6 118
 #define TLC_BLANK 119
 #define TLC_DSPRPT 120
 #define TLC_TMGRST 121
@@ -27,6 +29,8 @@ uint16 brightness[128];
 uint32 column = 0;
 int frames = 0;
 int buffer = 0;
+
+byte global_brightness = 127;
 
 volatile int vblank = 0;
 
@@ -81,9 +85,9 @@ void led_data_init()
     led_set(config1, TLC_ESPWM, 0);
 
     // full brightness
-    for(int i=112; i<=118; ++i) {
-        led_set(config0, i, 1);
-        led_set(config1, i, 1);
+    for(int i = TLC_BRIGHTNESS0; i <= TLC_BRIGHTNESS6; ++i) {
+        led_set(config0, i, 0);
+        led_set(config1, i, 0);
     }
 }
 
@@ -203,6 +207,7 @@ extern "C" void user_main()
         }
 
         while(LL_ADC_REG_IsConversionOngoing(ADC1) != 0) {
+            __nop();
         }
 
         LL_ADC_ClearFlag_EOC(ADC1);
@@ -214,10 +219,8 @@ extern "C" void user_main()
         GPO_DEBUG_LED_GPIO_Port->BSRR = GPO_DEBUG_LED_Pin << 16;
 
         b = (b + 8) & 65535;
-        
-        //uint32 c = (b * b) >> (16 + 6);
-        
-        int c = (x - 0x300);
+
+        int c = (x - 0x180);
         if(c < 0) {
             c = 0;
         }
@@ -225,11 +228,29 @@ extern "C" void user_main()
             c = 4095;
         }
         
-        ambient_target += (ambient_target - c) >> 4;
-        c = ambient_target >> 4;
+        c -= ambient;
+        
+        if(c < -2) {
+            c = -2;
+        }
+        else if(c > 2) {
+            c = 2;
+        }
+        ambient += c;
+        
+        if(ambient < 32) {
+            ambient = 32;
+        }
+        
+        c = ((ambient * ambient) >> (12 + 3)) + 4;
+        
+        c = 0 << 4;
+
+        config0[10] = 0x80 | global_brightness;
+        config1[10] = global_brightness;
 
         for(int i=0; i<128; ++i) {
-            brightness[i] = c;
+            brightness[i] = 1023;
         }
         frame_update(brightness, spi_data[buffer]);
     }
