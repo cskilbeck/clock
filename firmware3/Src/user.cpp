@@ -196,6 +196,8 @@ extern "C" void user_main()
     uint32 ambient = 0;
     uint32 ambient_target = 0;
     
+    GPIOA->BSRR = 1 << 3;
+    
     uint32 b = 0;
     while(1) {
         GPO_DEBUG_LED_GPIO_Port->BSRR = GPO_DEBUG_LED_Pin;
