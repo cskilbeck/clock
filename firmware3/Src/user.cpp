@@ -8,6 +8,11 @@ struct spi_packet
     uint32 column_mask;    // should it activate next column when this one is complete?
 };
 
+uint8 const ledmap[128] =
+{
+    15,13,12,11,10,    8,7,6,5,4,     2,1,0,31,30,     28,27,26,25,24,     22,21,20,19,18
+};
+
 #define TLC_SETCONFIG 192
 
 #define TLC_BRIGHTNESS0 112
@@ -182,7 +187,7 @@ extern "C" void user_main()
 
     // start led driver timer
     TIM17->SR &= TIM_SR_UIF;
-    TIM17->ARR = 2540;
+    TIM17->ARR = 5000;
     TIM17->PSC = 0;
     TIM17->DIER |= TIM_DIER_UIE;
     TIM17->CR1 |= TIM_CR1_CEN;
@@ -251,9 +256,12 @@ extern "C" void user_main()
         config0[10] = 0x80 | global_brightness;
         config1[10] = global_brightness;
 
+        int q = (frames >> 4) & 1023;
+        q = (q * q) >> 10;
         for(int i=0; i<128; ++i) {
-            brightness[i] = 1023;
+            brightness[i] = 0;
         }
+        brightness[7] = 1023;
         frame_update(brightness, spi_data[buffer]);
     }
 }
