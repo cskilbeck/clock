@@ -156,6 +156,8 @@ void led_data_init()
     set_global_brightness(127);
 }
 
+// pack uint16 brightness values into 12 bit buffer (3 nibbles each)
+
 void frame_update(uint16 *brightness, byte *spi_data)
 {
     uint16 *b = brightness;
@@ -172,13 +174,16 @@ void frame_update(uint16 *brightness, byte *spi_data)
             // scale for ambience
             brt1 = (brt1 * ambient_scale) >> 16;
             brt2 = (brt2 * ambient_scale) >> 16;
-            
+
+            // stuff the nibbles
             *p++ = (brt1 >> 4) & 0xff;
             *p++ = ((brt1 << 4) & 0xf0) | ((brt2 >> 8) & 0xf);
             *p++ = brt2 & 0xff;
         }
     }
 }
+
+// kick off a spi transfer
 
 static inline void spi_send_packet()
 {
@@ -200,7 +205,7 @@ static inline void spi_send_packet()
     }
 }
 
-// spi packet sent, send next one if there is one
+// spi packet was sent, send next one if there is one
 
 extern "C" void DMA1_Channel1_IRQHandler()
 {
@@ -214,7 +219,7 @@ extern "C" void DMA1_Channel1_IRQHandler()
     // latch on
     GPO_LED_LATCH_GPIO_Port->BSRR = GPO_LED_LATCH_Pin;
 
-    // send the next spi_packet if there is one
+    // kick next spi_packet if there is one
     spi_send_packet();
 
     // latch off
@@ -252,20 +257,22 @@ extern "C" void SysTick_Handler()
     ticks += 1;
 }
 
-int speed = 1;
-
 extern "C" void user_main()
 {
-    // 0.9765625ms wall clock (but it drifts a lot, no crystal)
+    // disable 3-8 mux (all the gates go high)
+    GPIOA->BSRR = 1 << (3 + 16);
+    
+    // init SysTick wall clock
+    // 1024 ticks per second = 0.9765625ms / tick
+    // it drifts a lot, no crystal
     LL_InitTick(64000000U, 1024U);
     LL_SYSTICK_EnableIT();
     NVIC_EnableIRQ(SysTick_IRQn);
 
-    // 32MHz PWM clock
+    // init 32MHz PWM clock
     NVIC_DisableIRQ(TIM14_IRQn);
     TIM14->DIER = 0;
     TIM14->CCER |= TIM_CCER_CC1E;
-    TIM14->CR1 |= TIM_CR1_CEN;
 
     led_data_init();
 
@@ -273,7 +280,7 @@ extern "C" void user_main()
     NVIC_EnableIRQ(DMA1_Channel1_IRQn);
     NVIC_EnableIRQ(TIM17_IRQn);
     TIM17->SR &= TIM_SR_UIF;
-    TIM17->ARR = 4095;
+    TIM17->ARR = 3999;
     TIM17->PSC = 0;
     TIM17->DIER |= TIM_DIER_UIE;
     TIM17->CR1 |= TIM_CR1_CEN;
@@ -287,8 +294,12 @@ extern "C" void user_main()
     uint32 ambient = 0;
     uint32 ambient_target = 0;
 
+    // enable 3-8 mux
     GPIOA->BSRR = 1 << 3;
-    
+
+    // enable PWM clock
+    TIM14->CR1 |= TIM_CR1_CEN;
+
     uint32 b = 0;
     while(1) {
         
@@ -320,6 +331,8 @@ extern "C" void user_main()
         }
         
         set_global_brightness(ambient_scale >> 10);
+
+        // update frame buffer
         
         int mode = frames >> 10;
 
