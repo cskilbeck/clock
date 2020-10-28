@@ -1,9 +1,11 @@
+////////////////////////////////////////////////////////////////////////////////
 // dasclock firmware
 
 #include "main.h"
 #include "string.h"
 #include "util.h"
 
+////////////////////////////////////////////////////////////////////////////////
 // LED driver is TLC5949
 // see https://www.ti.com/lit/ds/symlink/tlc5949.pdf
 
@@ -15,6 +17,7 @@
 //      1 - this is config data (only bits 112..122 are used)
 // data sent as bytes, msb first so byte 0, bit 0 is 8th bit, byte 1, bit 7 is 9th bit etc
 
+////////////////////////////////////////////////////////////////////////////////
 // column_mask determines whether next column is activated before this packet is sent
 
 struct spi_packet
@@ -22,6 +25,8 @@ struct spi_packet
     byte *data;            // spi_data to send
     uint32 column_mask;    // should it activate next column when this one is complete?
 };
+
+////////////////////////////////////////////////////////////////////////////////
 
 // clang-format off
 uint8 const minutes_map[60] = {
@@ -44,6 +49,11 @@ uint8 const hours_map[12] = { 14, 8, 2, 29, 23, 17, 43, 37, 63, 57, 51, 76 };
 
 uint8 const colon_map[2] = { 80, 88 };
 
+uint8 const digit_map[8] = { 0, 1, 2, 3, 4, 5, 6, 7 };  // 0 is the semicolon
+
+uint8 const digit_base[7] = { 64, 80, 88, 96, 104, 112, 120 };
+
+////////////////////////////////////////////////////////////////////////////////
 // bit numbers for tlc5949 spi packet
 // buffer is 193 bits (we send 200, spill the first 7)
 
@@ -56,6 +66,8 @@ uint8 const colon_map[2] = { 80, 88 };
 #define TLC_TMGRST 121
 #define TLC_ESPWM 122
 
+////////////////////////////////////////////////////////////////////////////////
+
 uint8 spi_data[2][200];    // 25 * 8 * 2
 uint8 config0[25];
 uint8 config1[25];
@@ -63,7 +75,7 @@ uint8 config1[25];
 spi_packet spi_packets[2][32];
 spi_packet *next_spi_packet;
 
-uint16 brightness[128];
+uint16 brightness[128] = { 0 };
 
 uint32 column = 0;
 int frames = 0;
@@ -78,6 +90,7 @@ volatile int vblank = 0;
 // ticks is incremented 1024 times per second
 volatile uint32 ticks = 0;
 
+////////////////////////////////////////////////////////////////////////////////
 // set one bit of config data in a spi buffer
 
 void led_set(byte *data, int bit, int val)
@@ -88,11 +101,15 @@ void led_set(byte *data, int bit, int val)
     data[offset] = data[offset] & mask | set;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 void set_global_brightness(byte b)
 {
     config0[10] = 0x80 | b;
     config1[10] = 0x00 | b;
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 void led_data_init()
 {
@@ -156,6 +173,7 @@ void led_data_init()
     set_global_brightness(127);
 }
 
+////////////////////////////////////////////////////////////////////////////////
 // pack uint16 brightness values into 12 bit buffer (3 nibbles each)
 
 void frame_update(uint16 *brightness, byte *spi_data)
@@ -183,6 +201,7 @@ void frame_update(uint16 *brightness, byte *spi_data)
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////
 // kick off a spi transfer
 
 static inline void spi_send_packet()
@@ -205,6 +224,7 @@ static inline void spi_send_packet()
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////
 // spi packet was sent, send next one if there is one
 
 extern "C" void DMA1_Channel1_IRQHandler()
@@ -226,6 +246,7 @@ extern "C" void DMA1_Channel1_IRQHandler()
     GPO_LED_LATCH_GPIO_Port->BSRR = GPO_LED_LATCH_Pin << 16;
 }
 
+////////////////////////////////////////////////////////////////////////////////
 // next column irq
 // this irq should happen _just_ after the pwm for a column is complete
 
@@ -252,16 +273,121 @@ extern "C" void TIM17_IRQHandler()
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 extern "C" void SysTick_Handler()
 {
     ticks += 1;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// Frame updaters
+
+void test()
+{
+    memset(brightness, 0, sizeof(brightness));
+    brightness[0] = 1023;
+}
+
+void intro()
+{
+    int f = frames & 8191;
+    int pos = (f * (f >> 3)) >> 13;
+    int tail_scale = 1024 / (util::min(1023, (f * (f * 11)) >> 20) + 1);
+    int head = 1023;
+    int y = pos % 60;
+    for(int i = 0; i != 60; ++i) {
+        brightness[minutes_map[y]] = (head * head) >> 10;
+        y -= 1;
+        if(y < 0) {
+            y = 59;
+        }
+        head -= tail_scale;
+        if(head < 0) {
+            head = 0;
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void fade()
+{
+    int f = 1024 - (frames - (5 * 1024));
+    f = (f * f) >> 10;
+    for(int i=0; i<60; ++i) {
+        brightness[minutes_map[i]] = f;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void clock()
+{
+    for(int i = 0; i < 12; ++i) {
+        brightness[hours_map[i]] = 32;
+    }
+
+    int m = (ticks >> 10) % 60;
+
+    for(int i = 0; i < m; ++i) {
+        brightness[minutes_map[i]] = 512;
+    }
+    int q = ticks & 1023;
+    q = (q * q) >> 11;
+    brightness[minutes_map[m]] = q;
+    for(int i = m + 1; i < 60; ++i) {
+        brightness[minutes_map[i]] = 0;
+    }
+
+    int flash = util::abs((ticks & 1023) - 512);
+    flash = (flash * 9) >> 4;
+    flash = (flash * flash) >> 9;
+    flash = (flash * flash) >> 9;
+
+    for(int i=0; i<7; ++i) {
+        uint16 *d = brightness + digit_base[i];
+        for(int j=1; j<8; ++j) {
+            d[j] = 1023;
+        }
+    }
+    
+    brightness[colon_map[0]] = flash;
+    brightness[colon_map[1]] = flash;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+typedef void (* const update_function_t)();
+
+// index into this table at frames / 1024
+// so
+//  intro 0..4   (0    .. 5119 )
+//  fade  5      (5120 .. 6143 )
+//  clock 6      (6144 ..      )
+
+update_function_t update_function[] =
+{
+#if 1
+    test
+#else
+    intro,
+    intro,
+    intro,
+    intro,
+    intro,
+    fade,
+    clock
+#endif
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
 extern "C" void user_main()
 {
     // disable 3-8 mux (all the gates go high)
     GPIOA->BSRR = 1 << (3 + 16);
-    
+
     // init SysTick wall clock
     // 1024 ticks per second = 0.9765625ms / tick
     // it drifts a lot, no crystal
@@ -280,7 +406,7 @@ extern "C" void user_main()
     NVIC_EnableIRQ(DMA1_Channel1_IRQn);
     NVIC_EnableIRQ(TIM17_IRQn);
     TIM17->SR &= TIM_SR_UIF;
-    TIM17->ARR = 3999;
+    TIM17->ARR = 40000;
     TIM17->PSC = 0;
     TIM17->DIER |= TIM_DIER_UIE;
     TIM17->CR1 |= TIM_CR1_CEN;
@@ -294,11 +420,11 @@ extern "C" void user_main()
     uint32 ambient = 0;
     uint32 ambient_target = 0;
 
-    // enable 3-8 mux
-    GPIOA->BSRR = 1 << 3;
-
     // enable PWM clock
     TIM14->CR1 |= TIM_CR1_CEN;
+
+    // enable 3-8 mux
+    GPIOA->BSRR = 1 << 3;
 
     uint32 b = 0;
     while(1) {
@@ -334,68 +460,8 @@ extern "C" void user_main()
 
         // update frame buffer
         
-        int mode = frames >> 10;
-
-        if(mode <= 4) {
-            int f = frames & 8191;
-            int pos = (f * (f >> 3)) >> 13;
-            int tail_len = (f * (f * 11)) >> 20;
-            if(tail_len > 1023) {
-                tail_len = 1023;
-            }
-            int tail_scale = 1023 / tail_len;
-            int head = 1023;
-            int y = pos % 60;
-            for(int i = 0; i != 60; ++i) {
-                brightness[minutes_map[y]] = (head * head) >> 10;
-                y -= 1;
-                if(y < 0) {
-                    y = 59;
-                }
-                head -= tail_scale;
-                if(head < 0) {
-                    head = 0;
-                }
-            }
-        }
-        else if(mode == 5) {
-            int f = 1024 - (frames - (5 * 1024));
-            f = (f * f) >> 10;
-            for(int i=0; i<60; ++i) {
-                brightness[minutes_map[i]] = f;
-            }
-        }
-        else
-        {
-            int m = (ticks >> 10) % 60;
-            if(m < 0) {
-                m = 0;
-            }
-            if(m > 59) {
-                m = 59;
-            }
-
-            for(int i = 0; i < m; ++i) {
-                brightness[minutes_map[i]] = 1023;
-            }
-            int q = ticks & 1023;
-            q = (q * q) >> 10;
-            brightness[minutes_map[m]] = q;
-            for(int i = m + 1; i < 60; ++i) {
-                brightness[minutes_map[i]] = 0;
-            }
-        }
-        for(int i = 0; i < 12; ++i) {
-            brightness[hours_map[i]] = 32;
-        }
-        int flash = util::abs((ticks & 1023) - 512);
-        flash = (flash * flash) >> 9;
-        flash = (flash * flash) >> 9;
-
-        brightness[colon_map[0]] = flash;
-        brightness[colon_map[1]] = flash;
-
-        //memset(brightness, 0xff, sizeof(brightness));
+        uint f = frames >> 10;
+        update_function[util::min(util::countof(update_function) - 1, f)]();
 
         frame_update(brightness, spi_data[buffer]);
     }

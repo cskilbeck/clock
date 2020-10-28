@@ -50,6 +50,21 @@ namespace util
         return (a < 0) ? -a : a;
     }
 
+    template <typename T> T max(T a, T b)
+    {
+        return (a > b) ? a : b;
+    }
+
+    template <typename T> T min(T a, T b)
+    {
+        return (a < b) ? a : b;
+    }
+    
+    template <typename T, std::size_t N> constexpr std::size_t countof(T const (&)[N]) noexcept
+    {
+        return N;
+    }
+
 }    // namespace util
 
 // position of high bit in a uint32 or -1 if none are set
