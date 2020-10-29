@@ -424,6 +424,11 @@
               <FileType>1</FileType>
               <FilePath>../Src/stm32g0xx_it.c</FilePath>
             </File>
+            <File>
+              <FileName>segments.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>..\Src\segments.cpp</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

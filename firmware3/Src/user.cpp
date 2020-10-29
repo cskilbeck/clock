@@ -5,6 +5,8 @@
 #include "string.h"
 #include "util.h"
 
+extern byte segments[128];
+
 ////////////////////////////////////////////////////////////////////////////////
 // LED driver is TLC5949
 // see https://www.ti.com/lit/ds/symlink/tlc5949.pdf
@@ -49,7 +51,7 @@ uint8 const hours_map[12] = { 14, 8, 2, 29, 23, 17, 43, 37, 63, 57, 51, 76 };
 
 uint8 const colon_map[2] = { 80, 88 };
 
-uint8 const digit_map[8] = { 0, 1, 2, 3, 4, 5, 6, 7 };  // 0 is the semicolon
+uint8 const digit_map[8] = { 0, 7, 6, 5, 4, 3, 2, 1 };  // 0 is the semicolon
 
 uint8 const digit_base[7] = { 64, 80, 88, 96, 104, 112, 120 };
 
@@ -107,6 +109,17 @@ void set_global_brightness(byte b)
 {
     config0[10] = 0x80 | b;
     config1[10] = 0x00 | b;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void set_digit(uint16 *dst, int digit, uint16 b = 1023)
+{
+    byte x = segments[digit];
+    for(int i=0; i<8; ++i) {
+        dst[digit_map[i]] = ((x & 0x80) != 0) ? b : 0;
+        x <<= 1;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -285,8 +298,12 @@ extern "C" void SysTick_Handler()
 
 void test()
 {
-    memset(brightness, 0, sizeof(brightness));
-    brightness[0] = 1023;
+    for(int i=0; i<3; ++i) {
+        brightness[i] = 1023;
+    }
+//    memset(brightness, 0, sizeof(brightness));
+//    set_digit(brightness + digit_base[0], ((frames >> 7) % 10) + '0');
+//    brightness[0] = 1023;
 }
 
 void intro()
@@ -406,7 +423,7 @@ extern "C" void user_main()
     NVIC_EnableIRQ(DMA1_Channel1_IRQn);
     NVIC_EnableIRQ(TIM17_IRQn);
     TIM17->SR &= TIM_SR_UIF;
-    TIM17->ARR = 40000;
+    TIM17->ARR = 6000;
     TIM17->PSC = 0;
     TIM17->DIER |= TIM_DIER_UIE;
     TIM17->CR1 |= TIM_CR1_CEN;
