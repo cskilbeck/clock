@@ -1,0 +1,10 @@
+Output: Design Rules Check
+Type  : DRC
+From  : PCB Document [clock.PcbDoc]
+   Generated File[clock.html]
+
+
+Files Generated   : 1
+Documents Printed : 0
+
+Finished Output Generation At 23:03:33 On 29/10/2020

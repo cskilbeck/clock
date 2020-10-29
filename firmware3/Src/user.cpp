@@ -51,9 +51,9 @@ uint8 const hours_map[12] = { 14, 8, 2, 29, 23, 17, 43, 37, 63, 57, 51, 76 };
 
 uint8 const colon_map[2] = { 80, 88 };
 
-uint8 const digit_map[8] = { 0, 7, 6, 5, 4, 3, 2, 1 };  // 0 is the semicolon
+uint8 const digit_map[8] = { 0, 7, 6, 5, 4, 3, 2, 1 };    // 0 is the semicolon
 
-uint8 const digit_base[7] = { 64, 80, 88, 96, 104, 112, 120 };
+uint8 const digit_base[7] = { 64, 80, 88, 96, 120, 112, 104 };
 
 ////////////////////////////////////////////////////////////////////////////////
 // bit numbers for tlc5949 spi packet
@@ -113,13 +113,21 @@ void set_global_brightness(byte b)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void set_digit(uint16 *dst, int digit, uint16 b = 1023)
+void set_digit(int digit, int number, uint16 b = 1023)
 {
-    byte x = segments[digit];
-    for(int i=0; i<8; ++i) {
+    uint16 *dst = brightness + digit_base[digit];
+    byte x = segments[number];
+    for(int i = 0; i < 8; ++i) {
         dst[digit_map[i]] = ((x & 0x80) != 0) ? b : 0;
         x <<= 1;
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void set_decimal_point(int digit, uint16 b)
+{
+    brightness[digit_base[digit] + digit_map[0]] = b;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -167,11 +175,11 @@ void led_data_init()
     }
 
     // init the fixed config spi_data (first for blank=1, second for blank=0)
-    
+
     // config = 1 for both because they're both config packets
     led_set(config0, TLC_SETCONFIG, 1);
     led_set(config1, TLC_SETCONFIG, 1);
- 
+
     // display repeat = 0
     led_set(config0, TLC_DSPRPT, 0);
     led_set(config1, TLC_DSPRPT, 0);
@@ -205,6 +213,10 @@ void frame_update(uint16 *brightness, byte *spi_data)
             // scale for ambience
             brt1 = (brt1 * ambient_scale) >> 16;
             brt2 = (brt2 * ambient_scale) >> 16;
+            
+            // squared for ghetto gamma ramp
+            brt1 = (brt1 * brt1) >> 10;
+            brt2 = (brt2 * brt2) >> 10;
 
             // stuff the nibbles
             *p++ = (brt1 >> 4) & 0xff;
@@ -230,7 +242,7 @@ static inline void spi_send_packet()
         DMA1_Channel1->CCR = DMA_CCR_MINC | DMA_CCR_DIR | (2 << DMA_CCR_PL_Pos) | DMA_CCR_EN | DMA_CCR_TCIE;
         SPI1->CR1 = SPI_CR1_SPE | SPI_CR1_SSM | SPI_CR1_SSI | SPI_CR1_MSTR;
         SPI1->CR2 = SPI_CR2_TXDMAEN | (0x7 << SPI_CR2_DS_Pos);
- 
+
         // maybe activate next column
         GPIOA->BSRR = ((7 << 16) | column) & next_spi_packet->column_mask;
         next_spi_packet += 1;
@@ -298,12 +310,17 @@ extern "C" void SysTick_Handler()
 
 void test()
 {
-    for(int i=0; i<3; ++i) {
-        brightness[i] = 1023;
+    for(int i = 0; i < 128; ++i) {
+        brightness[i] = 0;
     }
-//    memset(brightness, 0, sizeof(brightness));
-//    set_digit(brightness + digit_base[0], ((frames >> 7) % 10) + '0');
-//    brightness[0] = 1023;
+    int f = (frames >> 8) & 127;
+    brightness[f] = 1023;
+    ambient_scale = 0xffff;
+    set_global_brightness(127);
+
+    //    memset(brightness, 0, sizeof(brightness));
+    //    set_digit(brightness + digit_base[0], ((frames >> 7) % 10) + '0');
+    //    brightness[0] = 1023;
 }
 
 void intro()
@@ -324,6 +341,8 @@ void intro()
             head = 0;
         }
     }
+    ambient_scale = 0xffff;
+    set_global_brightness(127);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -332,50 +351,54 @@ void fade()
 {
     int f = 1024 - (frames - (5 * 1024));
     f = (f * f) >> 10;
-    for(int i=0; i<60; ++i) {
+    for(int i = 0; i < 60; ++i) {
         brightness[minutes_map[i]] = f;
     }
+    ambient_scale = 0xffff;
+    set_global_brightness(127);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 void clock()
 {
-    for(int i = 0; i < 12; ++i) {
-        brightness[hours_map[i]] = 32;
-    }
+    int seconds = (ticks >> 10) + 42 + (60 * 23) + (3600 * 20);
+    int hours = (seconds / 3600) % 12;
+    int minutes = (seconds / 60) % 60;
 
-    int m = (ticks >> 10) % 60;
+    int m = seconds % 60;
+
+    for(int i = 0; i < 12; ++i) {
+        brightness[hours_map[i]] = 320;
+    }
 
     for(int i = 0; i < m; ++i) {
         brightness[minutes_map[i]] = 512;
     }
-    int q = ticks & 1023;
-    q = (q * q) >> 11;
-    brightness[minutes_map[m]] = q;
+    brightness[minutes_map[m]] = util::min(1023u, (ticks & 1023) * 4) >> 1;
     for(int i = m + 1; i < 60; ++i) {
         brightness[minutes_map[i]] = 0;
     }
 
-    int flash = util::abs((ticks & 1023) - 512);
-    flash = (flash * 9) >> 4;
-    flash = (flash * flash) >> 9;
-    flash = (flash * flash) >> 9;
-
-    for(int i=0; i<7; ++i) {
-        uint16 *d = brightness + digit_base[i];
-        for(int j=1; j<8; ++j) {
-            d[j] = 1023;
-        }
-    }
+    //set_digit(0, hours / 10 + '0');
+    set_digit(0, 0);
+    set_digit(1, hours % 10 + '0');
+    set_digit(2, minutes / 10 + '0');
+    set_digit(3, minutes % 10 + '0');
+    set_digit(4, m / 10 + '0', 384);
+    set_digit(5, m % 10 + '0', 384);
+    set_digit(6, 'P', 768);
     
+    uint flash = util::abs((static_cast<int>(ticks & 1023)) - 512);
+    flash >>= 1;
+
     brightness[colon_map[0]] = flash;
     brightness[colon_map[1]] = flash;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-typedef void (* const update_function_t)();
+typedef void (*const update_function_t)();
 
 // index into this table at frames / 1024
 // so
@@ -383,18 +406,11 @@ typedef void (* const update_function_t)();
 //  fade  5      (5120 .. 6143 )
 //  clock 6      (6144 ..      )
 
-update_function_t update_function[] =
-{
-#if 1
+update_function_t update_function[] = {
+#if 0
     test
 #else
-    intro,
-    intro,
-    intro,
-    intro,
-    intro,
-    fade,
-    clock
+    intro, intro, intro, intro, intro, fade, clock
 #endif
 };
 
@@ -423,7 +439,7 @@ extern "C" void user_main()
     NVIC_EnableIRQ(DMA1_Channel1_IRQn);
     NVIC_EnableIRQ(TIM17_IRQn);
     TIM17->SR &= TIM_SR_UIF;
-    TIM17->ARR = 6000;
+    TIM17->ARR = 3999;
     TIM17->PSC = 0;
     TIM17->DIER |= TIM_DIER_UIE;
     TIM17->CR1 |= TIM_CR1_CEN;
@@ -443,9 +459,8 @@ extern "C" void user_main()
     // enable 3-8 mux
     GPIOA->BSRR = 1 << 3;
 
-    uint32 b = 0;
     while(1) {
-        
+
         // kick off ADC for ambient light sensor
         LL_ADC_REG_StartConversion(ADC1);
 
@@ -463,20 +478,20 @@ extern "C" void user_main()
 
         // read ambient light ADC
         int adc = LL_ADC_REG_ReadConversionData12(ADC1);
-        
+
         ambient_light = ((ambient_light * 31) >> 5) + adc;
-        
+
         // high pass filter the ambient_light
 
-        ambient_scale = ((ambient_light * 100) >> 5) + 128;
+        ambient_scale = ((ambient_light * 100) >> 5) + 8192;
         if(ambient_scale > 65535) {
             ambient_scale = 65535;
         }
-        
+
         set_global_brightness(ambient_scale >> 10);
 
         // update frame buffer
-        
+
         uint f = frames >> 10;
         update_function[util::min(util::countof(update_function) - 1, f)]();
 
