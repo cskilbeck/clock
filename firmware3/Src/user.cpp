@@ -273,7 +273,7 @@ extern "C" void DMA1_Channel1_IRQHandler()
 
 ////////////////////////////////////////////////////////////////////////////////
 // next column irq
-// this irq should happen _just_ after the pwm for a column is complete
+// this irq should happen _just_ after the pwm for the last (8th) column is complete
 
 extern "C" void TIM17_IRQHandler()
 {
@@ -366,17 +366,17 @@ void clock()
     int hours = (seconds / 3600) % 12;
     int minutes = (seconds / 60) % 60;
 
-    int m = seconds % 60;
+    int secs = seconds % 60;
 
     for(int i = 0; i < 12; ++i) {
-        brightness[hours_map[i]] = 320;
+        brightness[hours_map[i]] = 192;
     }
 
-    for(int i = 0; i < m; ++i) {
-        brightness[minutes_map[i]] = 512;
+    for(int i = 0; i < secs; ++i) {
+        brightness[minutes_map[i]] = 256;
     }
-    brightness[minutes_map[m]] = util::min(1023u, (ticks & 1023) * 4) >> 1;
-    for(int i = m + 1; i < 60; ++i) {
+    brightness[minutes_map[secs]] = (util::min(1023u, (ticks & 1023) * 1) * 1) >> 2;
+    for(int i = secs + 1; i < 60; ++i) {
         brightness[minutes_map[i]] = 0;
     }
 
@@ -385,12 +385,13 @@ void clock()
     set_digit(1, hours % 10 + '0');
     set_digit(2, minutes / 10 + '0');
     set_digit(3, minutes % 10 + '0');
-    set_digit(4, m / 10 + '0', 384);
-    set_digit(5, m % 10 + '0', 384);
-    set_digit(6, 'P', 768);
+//    set_digit(4, secs / 10 + '0', 620);
+//    set_digit(5, secs % 10 + '0', 620);
+    set_digit(6, 'P', 900);
     
-    uint flash = util::abs((static_cast<int>(ticks & 1023)) - 512);
-    flash >>= 1;
+    uint flash = util::abs(((int)(ticks + 573) & 1023) - 512);
+    flash = util::min(1023u, flash << 3) >> 2;
+    flash = 256;
 
     brightness[colon_map[0]] = flash;
     brightness[colon_map[1]] = flash;
