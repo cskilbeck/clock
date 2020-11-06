@@ -273,7 +273,7 @@ extern "C" void DMA1_Channel1_IRQHandler()
 
 ////////////////////////////////////////////////////////////////////////////////
 // next column irq
-// this irq should happen _just_ after the pwm for the last (8th) column is complete
+// this irq should happen _just_ after the pwm for the last column is complete
 
 extern "C" void TIM17_IRQHandler()
 {
