@@ -4,6 +4,15 @@
 #include "main.h"
 #include "string.h"
 #include "util.h"
+#include <cstddef>
+
+typedef struct
+{
+    uint64 timestamp;    // # of 100uS ticks since epoch midnight 1st Jan 1970
+    uint32 options;      // 32 option bits
+    uint16 signature;    // signature must be 'DC'
+    uint16 crc;            // 16 bit crc of previous fields
+} __attribute__((packed)) message_t;
 
 extern byte segments[128];
 
@@ -107,20 +116,42 @@ void led_set(byte *data, int bit, int val)
 
 void set_global_brightness(byte b)
 {
+    b &= 127;
     config0[10] = 0x80 | b;
     config1[10] = 0x00 | b;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void set_digit(int digit, int number, uint16 b = 1023)
+void set_ascii(int digit, int c, uint16 b = 1023)
 {
     uint16 *dst = brightness + digit_base[digit];
-    byte x = segments[number];
+    byte x = segments[c];
     for(int i = 0; i < 8; ++i) {
         dst[digit_map[i]] = ((x & 0x80) != 0) ? b : 0;
         x <<= 1;
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void set_digit(int digit, int number, uint16 b = 1023)
+{
+	if(number > 9) {
+		number += 'A' - 10;
+	} else {
+		number += '0';
+	}
+	set_ascii(digit, number);
+}
+
+void set_hex(int start_digit, int value, int num_digits, uint16 b = 1023)
+{
+	int shift = (num_digits - 1) * 4;
+	for(int i=0; i<num_digits; ++i) {
+		set_digit(start_digit++, (value >> shift) & 0xf, b);
+		shift -= 4;
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -272,6 +303,110 @@ extern "C" void DMA1_Channel1_IRQHandler()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// kick off serial read from esp12
+
+byte uart_buffer[64];
+
+void serial_read()
+{
+	LL_USART_DisableRxTimeout(USART1);
+	LL_USART_ClearFlag_RTO(USART1);
+    LL_DMA_SetPeriphAddress(DMA1, LL_DMA_CHANNEL_2, (uint32_t)&USART1->RDR);
+    LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_2, (uint32_t)uart_buffer);
+    LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_2, util::countof(uart_buffer));
+	LL_USART_EnableDMAReq_RX(USART1);
+    LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_2);
+
+	NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
+	NVIC_EnableIRQ(USART1_IRQn);
+	
+	LL_USART_EnableIT_IDLE(USART1);
+	LL_DMA_EnableIT_HT(DMA1, LL_DMA_CHANNEL_2);
+	LL_DMA_EnableIT_TC(DMA1, LL_DMA_CHANNEL_2);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+char const banner[16 + 1] = "HELLOSAILORWORLD";
+
+volatile bool got_serial_data = false;
+
+volatile uint32 new_pos = 0;
+uint32 old_pos = 0;
+
+int NPX = 0;
+
+byte &uart_byte(int offset)
+{
+	return uart_buffer[offset & 63];
+}
+
+bool check_word(int offset, uint16 x)
+{
+	byte lo = x & 0xff;
+	byte hi = x >> 8;
+	return uart_byte(offset) == lo && uart_byte(offset + 1) == hi;
+}
+
+bool validate_message(int start)
+{
+	if(!check_word(start + offsetof(message_t, signature), 'DC')) {
+		return false;
+	}
+	
+    uint16 crc = 0xffff;
+	
+	int end = start + offsetof(message_t, crc);
+	
+    for(int i = start; i != end; ++i) {
+        uint16 x = (crc >> 8) ^ uart_byte(i);
+        x ^= x >> 4;
+        crc = (crc << 8) ^ (x << 12) ^ (x << 5) ^ x;
+    }
+    return check_word(start + offsetof(message_t, crc), crc);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// some bytes have arrived on the serial port, notify main loop
+
+void process_serial()
+{
+	int p = util::countof(uart_buffer) - LL_DMA_GetDataLength(DMA1, LL_DMA_CHANNEL_2);
+	if(p != old_pos) {
+		got_serial_data = true;
+		new_pos = p;
+	}
+	old_pos = p;
+	if(old_pos == util::countof(uart_buffer)) {
+		old_pos = 0;
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+extern "C" void DMA1_Channel2_3_IRQHandler()
+{
+	if(LL_DMA_IsActiveFlag_TC2(DMA1)) {
+		LL_DMA_ClearFlag_TC2(DMA1);
+		process_serial();
+	}
+	if(LL_DMA_IsActiveFlag_HT2(DMA1)) {
+		LL_DMA_ClearFlag_HT2(DMA1);
+		process_serial();
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+extern "C" void USART1_IRQHandler()
+{
+	if(LL_USART_IsActiveFlag_IDLE(USART1)) {
+		LL_USART_ClearFlag_IDLE(USART1);
+		process_serial();
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // next column irq
 // this irq should happen _just_ after the pwm for the most recent column is complete
 
@@ -310,18 +445,24 @@ extern "C" void SysTick_Handler()
 
 void test()
 {
-    for(int i = 0; i < 128; ++i) {
-        brightness[i] = 0;
+	int i;
+    for(i = 0; i <= NPX; ++i) {
+        brightness[i] = 1023;
     }
-    int f = (frames >> 8) & 127;
-    brightness[f] = 1023;
+	for(; i < 64; ++i) {
+		brightness[i] = 0;
+	}
+//    int f = (frames >> 8) & 127;
+//    brightness[f] = 1023;
     ambient_scale = 0xffff;
     set_global_brightness(127);
 
     //    memset(brightness, 0, sizeof(brightness));
-    //    set_digit(brightness + digit_base[0], ((frames >> 7) % 10) + '0');
+    //    set_digit(brightness + digit_base[0], ((frames >> 7) % 10));
     //    brightness[0] = 1023;
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 void intro()
 {
@@ -380,13 +521,13 @@ void clock()
         brightness[minutes_map[i]] = 0;
     }
 
-    //set_digit(0, hours / 10 + '0');
+    //set_digit(0, hours / 10);
     set_digit(0, 0);
-    set_digit(1, hours % 10 + '0');
-    set_digit(2, minutes / 10 + '0');
-    set_digit(3, minutes % 10 + '0');
-//    set_digit(4, secs / 10 + '0', 620);
-//    set_digit(5, secs % 10 + '0', 620);
+    set_digit(1, hours % 10);
+    set_digit(2, minutes / 10);
+    set_digit(3, minutes % 10);
+//    set_digit(4, secs / 10, 620);
+//    set_digit(5, secs % 10, 620);
     set_digit(6, 'P', 900);
     
     uint flash = util::abs(((int)(ticks + 573) & 1023) - 512);
@@ -408,12 +549,20 @@ typedef void (*const update_function_t)();
 //  clock 6      (6144 ..      )
 
 update_function_t update_function[] = {
-#if 0
+#if 1
     test
 #else
     intro, intro, intro, intro, intro, fade, clock
 #endif
 };
+
+void delay(int t)
+{
+	int n = ticks + t;
+	for(int i=ticks; i<t; ++i) {
+		__NOP();
+	}
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -440,7 +589,7 @@ extern "C" void user_main()
     NVIC_EnableIRQ(DMA1_Channel1_IRQn);
     NVIC_EnableIRQ(TIM17_IRQn);
     TIM17->SR &= TIM_SR_UIF;
-    TIM17->ARR = 3999;
+    TIM17->ARR = 2999;
     TIM17->PSC = 0;
     TIM17->DIER |= TIM_DIER_UIE;
     TIM17->CR1 |= TIM_CR1_CEN;
@@ -459,7 +608,11 @@ extern "C" void user_main()
 
     // enable 3-8 mux
     GPIOA->BSRR = 1 << 3;
-
+	
+	delay(100000);
+	
+	serial_read();
+	
     while(1) {
 
         // kick off ADC for ambient light sensor
@@ -477,25 +630,38 @@ extern "C" void user_main()
             __nop();
         }
 
+		if(got_serial_data) {
+			got_serial_data = false;
+			int msg_start = ((int)new_pos - sizeof(message_t)) & 63;
+			set_digit(0, (uart_byte(msg_start + offsetof(message_t, signature) + 0) >> 4) & 0xf);
+			set_digit(1, (uart_byte(msg_start + offsetof(message_t, signature) + 0) >> 0) & 0xf);
+			set_digit(2, (uart_byte(msg_start + offsetof(message_t, signature) + 1) >> 4) & 0xf);
+			set_digit(3, (uart_byte(msg_start + offsetof(message_t, signature) + 1) >> 0) & 0xf);
+			set_hex(4, msg_start, 3);
+			if(validate_message(msg_start)) {
+				NPX = (NPX + 1) & 63;
+				uart_byte(msg_start + offsetof(message_t, crc)) = 0;
+			} else {
+				NPX = (NPX + 2) & 63;
+			}
+		}
+
         // read ambient light ADC
         int adc = LL_ADC_REG_ReadConversionData12(ADC1);
 
-        ambient_light = ((ambient_light * 31) >> 5) + adc;
-
         // high pass filter the ambient_light
-
+        ambient_light = ((ambient_light * 31) >> 5) + adc;
         ambient_scale = ((ambient_light * 100) >> 5) + 8192;
         if(ambient_scale > 65535) {
             ambient_scale = 65535;
         }
 
-        set_global_brightness(ambient_scale >> 10);
-
+        set_global_brightness(ambient_scale >> 9);
+		
         // update frame buffer
 
         uint f = frames >> 10;
         update_function[util::min(util::countof(update_function) - 1, f)]();
-
         frame_update(brightness, spi_data[buffer]);
     }
 }

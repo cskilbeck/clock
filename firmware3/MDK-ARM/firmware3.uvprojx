@@ -314,7 +314,7 @@
           </ArmAdsMisc>
           <Cads>
             <interw>1</interw>
-            <Optim>5</Optim>
+            <Optim>2</Optim>
             <oTime>0</oTime>
             <SplitLS>0</SplitLS>
             <OneElfS>1</OneElfS>
@@ -333,14 +333,14 @@
             <v6LangP>6</v6LangP>
             <vShortEn>1</vShortEn>
             <vShortWch>1</vShortWch>
-            <v6Lto>1</v6Lto>
+            <v6Lto>0</v6Lto>
             <v6WtE>0</v6WtE>
             <v6Rtti>0</v6Rtti>
             <VariousControls>
-              <MiscControls>-Wno-deprecated-register</MiscControls>
+              <MiscControls>-Wno-deprecated-register -Wno-multichar</MiscControls>
               <Define>STM32G030xx,USE_FULL_LL_DRIVER,HSE_VALUE=8000000,HSE_STARTUP_TIMEOUT=100,LSE_STARTUP_TIMEOUT=5000,LSE_VALUE=32768,EXTERNAL_CLOCK_VALUE=12288000,HSI_VALUE=16000000,LSI_VALUE=32000,VDD_VALUE=3300,INSTRUCTION_CACHE_ENABLE=1,DATA_CACHE_ENABLE=1,PREFETCH_ENABLE=1</Define>
               <Undefine></Undefine>
-              <IncludePath>../Inc;                                   ../Drivers/STM32G0xx_HAL_Driver/Inc;                                   ../Drivers/CMSIS/Device/ST/STM32G0xx/Include;                                   ../Drivers/CMSIS/Include</IncludePath>
+              <IncludePath>../Inc;                                      ../Drivers/STM32G0xx_HAL_Driver/Inc;                                      ../Drivers/CMSIS/Device/ST/STM32G0xx/Include;                                      ../Drivers/CMSIS/Include</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -415,6 +415,11 @@
               <FilePath>..\Inc\util.h</FilePath>
             </File>
             <File>
+              <FileName>segments.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>..\Src\segments.cpp</FilePath>
+            </File>
+            <File>
               <FileName>main.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Src/main.c</FilePath>
@@ -423,11 +428,6 @@
               <FileName>stm32g0xx_it.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Src/stm32g0xx_it.c</FilePath>
-            </File>
-            <File>
-              <FileName>segments.cpp</FileName>
-              <FileType>8</FileType>
-              <FilePath>..\Src\segments.cpp</FilePath>
             </File>
           </Files>
         </Group>
@@ -506,8 +506,8 @@
   <RTE>
     <apis/>
     <components>
-      <component Cclass="CMSIS" Cgroup="CORE" Cvendor="ARM" Cversion="5.3.0" condition="ARMv6_7_8-M Device">
-        <package name="CMSIS" schemaVersion="1.3" url="http://www.keil.com/pack/" vendor="ARM" version="5.6.0"/>
+      <component Cclass="CMSIS" Cgroup="CORE" Cvendor="ARM" Cversion="5.4.0" condition="ARMv6_7_8-M Device">
+        <package name="CMSIS" schemaVersion="1.3" url="http://www.keil.com/pack/" vendor="ARM" version="5.7.0"/>
         <targetInfos>
           <targetInfo name="firmware3"/>
         </targetInfos>

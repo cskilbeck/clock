@@ -53,7 +53,7 @@ void MX_SPI1_Init(void);
 void MX_USART1_UART_Init(void);
 void MX_TIM14_Init(void);
 void MX_ADC1_Init(void);
-static void MX_TIM17_Init(void);
+void MX_TIM17_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -97,6 +97,7 @@ int main(void)
   MX_GPIO_Init();
   MX_DMA_Init();
   MX_SPI1_Init();
+  MX_USART1_UART_Init();
   MX_TIM14_Init();
   MX_ADC1_Init();
   MX_TIM17_Init();
@@ -205,7 +206,7 @@ void MX_ADC1_Init(void)
   ADC_REG_InitStruct.SequencerDiscont = LL_ADC_REG_SEQ_DISCONT_DISABLE;
   ADC_REG_InitStruct.ContinuousMode = LL_ADC_REG_CONV_SINGLE;
   ADC_REG_InitStruct.DMATransfer = LL_ADC_REG_DMA_TRANSFER_NONE;
-  ADC_REG_InitStruct.Overrun = LL_ADC_REG_OVR_DATA_OVERWRITTEN;
+  ADC_REG_InitStruct.Overrun = LL_ADC_REG_OVR_DATA_PRESERVED;
   LL_ADC_REG_Init(ADC1, &ADC_REG_InitStruct);
   LL_ADC_SetOverSamplingScope(ADC1, LL_ADC_OVS_GRP_REGULAR_CONTINUED);
   LL_ADC_ConfigOverSamplingRatioShift(ADC1, LL_ADC_OVS_RATIO_16, LL_ADC_OVS_SHIFT_RIGHT_4);
@@ -388,7 +389,7 @@ void MX_TIM14_Init(void)
   * @param None
   * @retval None
   */
-static void MX_TIM17_Init(void)
+void MX_TIM17_Init(void)
 {
 
   /* USER CODE BEGIN TIM17_Init 0 */
@@ -456,7 +457,7 @@ void MX_USART1_UART_Init(void)
 
   LL_DMA_SetChannelPriorityLevel(DMA1, LL_DMA_CHANNEL_2, LL_DMA_PRIORITY_LOW);
 
-  LL_DMA_SetMode(DMA1, LL_DMA_CHANNEL_2, LL_DMA_MODE_NORMAL);
+  LL_DMA_SetMode(DMA1, LL_DMA_CHANNEL_2, LL_DMA_MODE_CIRCULAR);
 
   LL_DMA_SetPeriphIncMode(DMA1, LL_DMA_CHANNEL_2, LL_DMA_PERIPH_NOINCREMENT);
 
@@ -489,7 +490,7 @@ void MX_USART1_UART_Init(void)
   LL_USART_Enable(USART1);
 
   /* Polling USART1 initialisation */
-  while((!(LL_USART_IsActiveFlag_TEACK(USART1))) || (!(LL_USART_IsActiveFlag_REACK(USART1))))
+  while(/*(!(LL_USART_IsActiveFlag_TEACK(USART1))) ||*/ (!(LL_USART_IsActiveFlag_REACK(USART1))))
   {
   }
   /* USER CODE BEGIN USART1_Init 2 */
