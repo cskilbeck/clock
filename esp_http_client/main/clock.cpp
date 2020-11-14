@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <utility>
+
+#include <sys/timeb.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -73,6 +76,11 @@ enum
     key_lon
 };
 
+static char const timezone_api_url_fmt[] = "http://api.timezonedb.com/v2.1/get-time-zone?key=VV0F65261GPD&by=position&lat=%f&lng=%f&format=json";
+int const json_token_max = 128;
+static jsmntok_t tokens[json_token_max]; /* We expect no more than 128 tokens */
+static char url_buffer[countof(timezone_api_url_fmt) + 40];
+
 //////////////////////////////////////////////////////////////////////
 
 int clock_timezone_offset()
@@ -88,12 +96,18 @@ clock_state_enum get_clock_state()
 }
 
 //////////////////////////////////////////////////////////////////////
+// http_getter which just accumulates the content into a buffer
 
 struct http_get : http_getter
 {
     byte *data = null;
     size_t capacity = 0;
     size_t length = 0;
+
+    virtual ~http_get()
+    {
+        release();
+    }
 
     void init(size_t max_size)
     {
@@ -104,8 +118,10 @@ struct http_get : http_getter
 
     void release()
     {
-        delete[] data;
-        data = null;
+        if(data != null) {
+            delete[] data;
+            data = null;
+        }
     }
 
     void on_data(byte const *incoming_data, size_t len) override
@@ -113,11 +129,12 @@ struct http_get : http_getter
         size_t copy_size = min(len, capacity - length);
         memcpy(data + length, incoming_data, copy_size);
         length += copy_size;
-        ESP_LOGI(TAG, "got %d bytes, total so far = %d", len, length);
+        ESP_LOGV(TAG, "got %d bytes, total so far = %d", len, length);
     }
 };
 
 //////////////////////////////////////////////////////////////////////
+// http handler, attach a http_getter to the http client
 
 esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 {
@@ -160,42 +177,17 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 }
 
 //////////////////////////////////////////////////////////////////////
+// setup sntp
 
-int initialize_sntp()
+void sntp_task(void *)
 {
-    ESP_LOGI(TAG, "initialize_sntp");
-    bool got_sntp = false;
-    while(!got_sntp) {
-        wifi_wait_until(wifi_event_connected, portMAX_DELAY);
-        sntp_setoperatingmode(SNTP_OPMODE_POLL);
-        sntp_setservername(0, const_cast<char *>("pool.ntp.org"));
-        sntp_init();
-        time_t now = 0;
-        struct tm timeinfo;
-        memset(&timeinfo, 0, sizeof(timeinfo));
-        int retry = 0;
-        int const retry_count = 100;
-        while(timeinfo.tm_year < (2016 - 1900) && ++retry < retry_count) {
-            ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
-            vTaskDelay(2000 / portTICK_PERIOD_MS);
-            time(&now);
-            localtime_r(&now, &timeinfo);
-        }
-        if(retry >= retry_count) {
-            ESP_LOGI(TAG, "retries exhausted: sntp_stop()");
-            sntp_stop();
-        } else {
-            char buffer[64];
-            strftime(buffer, countof(buffer), "%c", &timeinfo);
-            ESP_LOGI(TAG, "system time is ready: %s", buffer);
-            clock_state = clock_state_ready;
-            got_sntp = true;
-        }
+    while(true) {
+        vTaskDelay((1000 * 60 * 60) / portTICK_PERIOD_MS);
     }
-    return got_sntp;
 }
 
 //////////////////////////////////////////////////////////////////////
+// format a time_t into a string
 
 void time_to_str(time_t t, char *buf)
 {
@@ -213,6 +205,7 @@ void time_to_str(time_t t, char *buf)
 }
 
 //////////////////////////////////////////////////////////////////////
+// get current time as a string
 
 char const *current_time(char *buffer)
 {
@@ -224,6 +217,7 @@ char const *current_time(char *buffer)
 }
 
 //////////////////////////////////////////////////////////////////////
+// send STM32 message with current time & options
 
 void clock_draw(uint32 fg_color, uint32 bg_color)
 {
@@ -237,22 +231,12 @@ void clock_draw(uint32 fg_color, uint32 bg_color)
 }
 
 //////////////////////////////////////////////////////////////////////
-
-static char const api_url_fmt[] = "http://api.timezonedb.com/v2.1/get-time-zone?key=VV0F65261GPD&by=position&lat=%f&lng=%f&format=json";
-
-// static bool jsoneq(char const *json, jsmntok_t const &tok, char const *s)
-// {
-//     return tok.type == JSMN_STRING && strlen(s) == tok.len() && strncmp(json + tok.start, s, tok.len()) == 0;
-// }
-
-int const token_max = 128;
-static jsmntok_t tokens[token_max]; /* We expect no more than 128 tokens */
-static char url_buffer[countof(api_url_fmt) + 40];
+// get the current timezone for a given geolocation
 
 void clock_update_timezone(float lat, float lon)
 {
     ESP_LOGI(TAG, "Update timezone");
-    int buffer_len = sprintf(url_buffer, api_url_fmt, lat, lon);
+    int buffer_len = sprintf(url_buffer, timezone_api_url_fmt, lat, lon);
     ESP_LOGV(TAG, "CLOCK WOULD USE %s (%d)", url_buffer, buffer_len);
     http_get getter;
     getter.init(1024);
@@ -276,7 +260,7 @@ void clock_update_timezone(float lat, float lon)
         char abbrev[16];
         char next_abbrev[16];
         char const *b = reinterpret_cast<char const *>(getter.data);    // borrow to make this readable
-        int token_count = jsmn_parse(&p, b, getter.length, tokens, token_max);
+        int token_count = jsmn_parse(&p, b, getter.length, tokens, json_token_max);
         for(int i = 1; i < token_count; ++i) {
             jsmntok_t const &key = tokens[i];
             jsmntok_t const &val = tokens[i + 1];
@@ -308,7 +292,7 @@ void clock_update_timezone(float lat, float lon)
             sprintf(tz_buffer, "<%.5s>%-.2d:%02d", abbrev, -hours, -minutes);
             setenv("TZ", tz_buffer, 1);
             tzset();
-            ESP_LOGW(TAG, "TZ=%s", tz_buffer);
+            ESP_LOGV(TAG, "TZ=%s", tz_buffer);
         } else {
             ESP_LOGW(TAG, "HUH? TZ not got");
         }
@@ -317,8 +301,11 @@ void clock_update_timezone(float lat, float lon)
 }
 
 //////////////////////////////////////////////////////////////////////
+// get the ip address, latitude and longitude of this esp12
+// note geolocation can be wrong!
+// user should have an option to correct it with the buttons
 
-static void get_location()
+static esp_err_t get_location()
 {
     ip_json *api = ip_apis[which_api];
     which_api = 1 - which_api;
@@ -331,64 +318,83 @@ static void get_location()
     config.user_data = &getter;
     esp_http_client_handle_t client = esp_http_client_init(&config);
 
+    defer(esp_http_client_cleanup(client));
+
     esp_err_t err = esp_http_client_perform(client);
-    if(err == ESP_OK) {
-        int status_code = esp_http_client_get_status_code(client);
-        int content_length = esp_http_client_get_content_length(client);
-        ESP_LOGI(TAG, "HTTP GET Status = %d, content_length = %d", status_code, content_length);
-        ESP_LOGI(TAG, "CONTENT: %.*s", getter.length, getter.data);
-
-        jsmn_parser p;
-
-        bool got_ip_address = false;
-        int got_lat_lon = 0;
-        char ip_addr[16];
-
-        float ip_lat = 0;    // what we got from ip-api
-        float ip_lon = 0;
-
-        jsmn_init(&p);
-        char const *b = reinterpret_cast<char const *>(getter.data);
-        int token_count = jsmn_parse(&p, b, getter.length, tokens, token_max);
-        if(token_count > 0 && tokens[0].type == JSMN_OBJECT) {
-
-            for(int i = 1; i < token_count; i += 2) {
-                jsmntok_t const &key = tokens[i];
-                jsmntok_t const &val = tokens[i + 1];
-                ESP_LOGI(TAG, "KEY: %.*s, VAL: %.*s", key.len(), b + key.start, val.len(), b + val.start);
-                switch(api->get_key_id(b + key.start, key.len())) {
-                case key_ip:
-                    got_ip_address = true;
-                    val.get_str(ip_addr, b);
-                    break;
-                case key_lat:
-                    val.get_flt(ip_lat, b);
-                    got_lat_lon |= 1;
-                    break;
-                case key_lon:
-                    val.get_flt(ip_lon, b);
-                    got_lat_lon |= 2;
-                    break;
-                default:
-                    ESP_LOGE(TAG, "Unknown key: %.*s", val.len(), b + val.start);
-                    break;
-                }
-            }
-        }
-
-        if(got_lat_lon == 3 && got_ip_address) {
-            ESP_LOGI(TAG, "IP: %s, Lat: %f, Lon: %f", ip_addr, ip_lat, ip_lon);
-            clock_update_timezone(ip_lat, ip_lon);
-        } else {
-            ESP_LOGE(TAG, "Error getting geo location: %02x", got_lat_lon);
-        }
-    } else {
-        ESP_LOGE(TAG, "HTTP GET request failed: %d", err);
+    if(err != ESP_OK) {
+        return err;
     }
-    esp_http_client_cleanup(client);
+    int status_code = esp_http_client_get_status_code(client);
+    int content_length = esp_http_client_get_content_length(client);
+    ESP_LOGI(TAG, "HTTP GET Status = %d, content_length = %d", status_code, content_length);
+    ESP_LOGI(TAG, "CONTENT: %.*s", getter.length, getter.data);
+
+    if(status_code >= 400) {
+        ESP_LOGE(TAG, "HTTP GET request failed: %d", err);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    jsmn_parser p;
+
+    bool got_ip_address = false;
+    int got_lat_lon = 0;
+    char ip_addr[16];
+
+    float ip_lat = 0;    // what we got from ip-api
+    float ip_lon = 0;
+
+    jsmn_init(&p);
+    char const *b = reinterpret_cast<char const *>(getter.data);
+    int token_count = jsmn_parse(&p, b, getter.length, tokens, json_token_max);
+    if(token_count == 0 || tokens[0].type != JSMN_OBJECT) {
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    for(int i = 1; i < token_count; i += 2) {
+        jsmntok_t const &key = tokens[i];
+        jsmntok_t const &val = tokens[i + 1];
+        ESP_LOGV(TAG, "KEY: %.*s, VAL: %.*s", key.len(), b + key.start, val.len(), b + val.start);
+        switch(api->get_key_id(b + key.start, key.len())) {
+        case key_ip:
+            got_ip_address = true;
+            val.get_str(ip_addr, b);
+            break;
+        case key_lat:
+            val.get_flt(ip_lat, b);
+            got_lat_lon |= 1;
+            break;
+        case key_lon:
+            val.get_flt(ip_lon, b);
+            got_lat_lon |= 2;
+            break;
+        default:
+            ESP_LOGE(TAG, "Unknown key: %.*s", val.len(), b + val.start);
+            break;
+        }
+    }
+
+    if(got_lat_lon != 3 || !got_ip_address) {
+        ESP_LOGE(TAG, "Error getting geo location: %02x", got_lat_lon);
+        return ESP_ERR_NOT_FOUND;
+    }
+    ESP_LOGI(TAG, "IP: %s, Lat: %f, Lon: %f", ip_addr, ip_lat, ip_lon);
+    clock_update_timezone(ip_lat, ip_lon);
+    return ESP_OK;
 }
 
 //////////////////////////////////////////////////////////////////////
+
+bool is_sntp_working()
+{
+    time_t now;
+    struct tm timeinfo;
+    time(&now);
+    localtime_r(&now, &timeinfo);
+    return timeinfo.tm_year >= (2020 - 1900);    // bogus, but it's the recommended way
+}
+
+//////////////////////////////////////////////////////////////////////
+// calculate a crc for an stm32 message
 
 uint16 crc16(message_body_t const *m)
 {
@@ -404,13 +410,7 @@ uint16 crc16(message_body_t const *m)
 }
 
 //////////////////////////////////////////////////////////////////////
-
-bool is_valid_message(message_t *m)
-{
-    return m->msg.signature == 0xDA5C && crc16(&m->msg) == m->crc;
-}
-
-//////////////////////////////////////////////////////////////////////
+// setup an stm32 message
 
 void init_message(message_t *message, uint64_t timestamp, clock_options_t options)
 {
@@ -422,16 +422,44 @@ void init_message(message_t *message, uint64_t timestamp, clock_options_t option
 
 //////////////////////////////////////////////////////////////////////
 
-void clock_task(void *pvParameters)
+void send_time_to_stm32()
 {
+    struct timespec t;
+    clock_gettime(CLOCK_REALTIME, &t);
+    t.tv_sec += clock_timezone_offset();
+    message_t m;
+    clock_options_t options;
+    options.options = 0;
+    init_message(&m, (t.tv_sec) * 1000llu + (t.tv_nsec / 1000000llu), options);
+    ESP_LOGI(TAG, "S: %ld, N: %ld, TS: %lld", t.tv_sec, t.tv_nsec, m.msg.timestamp);
+    uart_write_bytes(UART_NUM_1, reinterpret_cast<char const *>(&m), sizeof(message_t));
+}
+
+//////////////////////////////////////////////////////////////////////
+
+void do_clock()
+{
+    initialise_wifi();
+
+    clock_state = clock_state_idle;
     ESP_LOGI(TAG, "Clock task begins");
     wifi_wait_until(wifi_event_connected, portMAX_DELAY);
 
+    clock_state = clock_state_initializing;
     ESP_LOGI(TAG, "Wifi connected, getting time and timezone");
-    initialize_sntp();
-    get_location();
+
+    // init sntp
+    sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    sntp_setservername(0, const_cast<char *>("pool.ntp.org"));
+    wifi_wait_until(wifi_event_connected, portMAX_DELAY);
+    sntp_init();
+
+    if(get_location() != ESP_OK) {
+        ESP_LOGE(TAG, "Can't get IP/Location/Timezone");
+    }
 
     ESP_LOGI(TAG, "Clock init complete");
+    clock_state = clock_state_ready;
 
     // setup uart1 for sending stm32 messages
     uart_config_t uart_config = { .baud_rate = 115200,
@@ -444,6 +472,11 @@ void clock_task(void *pvParameters)
     uart_driver_install(UART_NUM_1, STM32_MSG_BUF_SIZE * 2, 0, 0, NULL, 0);
 
     while(true) {
-        vTaskDelay(portMAX_DELAY);
+        if(is_sntp_working()) {
+            send_time_to_stm32();
+        } else {
+            ESP_LOGI(TAG, "Waiting for SNTP");
+        }
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }

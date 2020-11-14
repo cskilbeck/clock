@@ -6,3 +6,4 @@
 # embed files from the "certs" directory as binary data symbols
 # in the app
 
+CXXFLAGS += "-Wno-unused-variable"

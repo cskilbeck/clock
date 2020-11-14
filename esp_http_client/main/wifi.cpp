@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <cstddef>
+#include <utility>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -53,7 +54,7 @@ namespace
             ESP_LOGI(TAG, "SC_STATUS_LINK");
             wifi_config_t *wifi_config = reinterpret_cast<wifi_config_t *>(pdata);
             ESP_LOGI(TAG, "SSID:%s", wifi_config->sta.ssid);
-            ESP_LOGI(TAG, "PASSWORD:%s", wifi_config->sta.password);
+            ESP_LOGV(TAG, "PASSWORD:%s", wifi_config->sta.password);
             ESP_ERROR_CHECK(esp_wifi_disconnect());
             ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, wifi_config));
             ESP_ERROR_CHECK(esp_wifi_connect());

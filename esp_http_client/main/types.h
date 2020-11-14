@@ -25,16 +25,24 @@ enum colon_flash_mode
     pulse = 3
 };
 
+
 struct clock_options_t
 {
-    uint32 brightness : 6;          // 64 levels of brightness
-    uint32 colon_flash_mode : 2;    // see colon_flash_mode enum
-    uint32 show_seconds : 1;        // seconds on or off
-    uint32 hours_12_24 : 1;         // 12/24 hour time format
-    uint32 show_am_pm : 1;          // show A or P
-    uint32 show_hour_ticks : 1;     // turn hour ticks on or off
-    uint32 soft_seconds : 1;        // seconds fade in or just switch on
-    uint32 test_display : 1;        // switch on all the leds at full brightness
+    union
+    {
+        struct
+        {
+            uint32 brightness : 6;          // 64 levels of brightness
+            uint32 colon_flash_mode : 2;    // see colon_flash_mode enum
+            uint32 show_seconds : 1;        // seconds on or off
+            uint32 hours_12_24 : 1;         // 12/24 hour time format
+            uint32 show_am_pm : 1;          // show A or P
+            uint32 show_hour_ticks : 1;     // turn hour ticks on or off
+            uint32 soft_seconds : 1;        // seconds fade in or just switch on
+            uint32 test_display : 1;        // switch on all the leds at full brightness
+        };
+        uint32 options;
+    };
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -42,7 +50,7 @@ struct clock_options_t
 
 struct message_body_t
 {
-    uint64 timestamp;           // # of 100uS ticks since epoch midnight 1st Jan 1970
+    uint64 timestamp;           // millis since epoch midnight 1st Jan 1970
     clock_options_t options;    // 32 option bits
     uint16 signature;           // signature must be 0xDA5C
 } __attribute__((packed));

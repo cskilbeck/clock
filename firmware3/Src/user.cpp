@@ -10,7 +10,7 @@ typedef struct
 {
     uint64 timestamp;    // # of 100uS ticks since epoch midnight 1st Jan 1970
     uint32 options;      // 32 option bits
-    uint16 signature;    // signature must be 'DC'
+    uint16 signature;    // signature must be 0xDA5C
     uint16 crc;            // 16 bit crc of previous fields
 } __attribute__((packed)) message_t;
 
@@ -334,6 +334,8 @@ volatile bool got_serial_data = false;
 volatile uint32 new_pos = 0;
 uint32 old_pos = 0;
 
+message_t last_msg;
+
 int NPX = 0;
 
 byte &uart_byte(int offset)
@@ -350,7 +352,7 @@ bool check_word(int offset, uint16 x)
 
 bool validate_message(int start)
 {
-	if(!check_word(start + offsetof(message_t, signature), 'DC')) {
+	if(!check_word(start + offsetof(message_t, signature), 0xDA5C)) {
 		return false;
 	}
 	
@@ -358,8 +360,11 @@ bool validate_message(int start)
 	
 	int end = start + offsetof(message_t, crc);
 	
+	byte *msg_ptr = reinterpret_cast<byte *>(&last_msg);
     for(int i = start; i != end; ++i) {
-        uint16 x = (crc >> 8) ^ uart_byte(i);
+		byte b = uart_byte(i);
+		*msg_ptr++ = b;
+        uint16 x = (crc >> 8) ^ b;
         x ^= x >> 4;
         crc = (crc << 8) ^ (x << 12) ^ (x << 5) ^ x;
     }
@@ -633,14 +638,33 @@ extern "C" void user_main()
 		if(got_serial_data) {
 			got_serial_data = false;
 			int msg_start = ((int)new_pos - sizeof(message_t)) & 63;
-			set_digit(0, (uart_byte(msg_start + offsetof(message_t, signature) + 0) >> 4) & 0xf);
-			set_digit(1, (uart_byte(msg_start + offsetof(message_t, signature) + 0) >> 0) & 0xf);
-			set_digit(2, (uart_byte(msg_start + offsetof(message_t, signature) + 1) >> 4) & 0xf);
-			set_digit(3, (uart_byte(msg_start + offsetof(message_t, signature) + 1) >> 0) & 0xf);
-			set_hex(4, msg_start, 3);
 			if(validate_message(msg_start)) {
+				
 				NPX = (NPX + 1) & 63;
 				uart_byte(msg_start + offsetof(message_t, crc)) = 0;
+
+				// we have a valid message with a timestamp in it
+				// 64bits, # of milliseconds since midnight Jan 1st 1970
+				// setup the digits
+
+				constexpr uint64 one_second = 1;
+				constexpr uint64 one_minute = one_second * 60;
+				constexpr uint64 one_hour = one_minute * 60;
+				constexpr uint64 one_day = one_hour * 24;
+				
+				uint64 daytime = (last_msg.timestamp / 1000llu) % one_day;
+
+				uint64 hours = daytime / one_hour;
+				uint32 minutes = (daytime % one_hour) / 60;
+				uint32 seconds = daytime % 60;
+				
+				set_digit(0, hours / 10);
+				set_digit(1, hours % 10);
+				set_digit(2, minutes / 10);
+				set_digit(3, minutes % 10);
+				set_digit(4, seconds / 10);
+				set_digit(5, seconds % 10);
+				
 			} else {
 				NPX = (NPX + 2) & 63;
 			}
