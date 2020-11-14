@@ -22,6 +22,7 @@
 #include "util.h"
 #include "wifi.h"
 #include "jsmn.h"
+#include "message.h"
 #include "clock.h"
 
 //////////////////////////////////////////////////////////////////////
@@ -396,11 +397,11 @@ bool is_sntp_working()
 //////////////////////////////////////////////////////////////////////
 // calculate a crc for an stm32 message
 
-uint16 crc16(message_body_t const *m)
+uint16 crc16(message_t const *m, size_t l)
 {
     uint16 crc = 0xffff;
     byte const *p = reinterpret_cast<byte const *>(m);
-    byte const *e = p + sizeof(message_body_t);
+    byte const *e = p + l;
     for(; p < e; ++p) {
         uint16 x = (crc >> 8) ^ *p;
         x ^= x >> 4;
@@ -410,29 +411,38 @@ uint16 crc16(message_body_t const *m)
 }
 
 //////////////////////////////////////////////////////////////////////
-// setup an stm32 message
 
-void init_message(message_t *message, uint64_t timestamp, clock_options_t options)
-{
-    message->msg.timestamp = timestamp;
-    message->msg.options = options;
-    message->msg.signature = 0xDA5C;
-    message->crc = crc16(&message->msg);
-}
+constexpr uint32 one_second = 1;
+constexpr uint32 one_minute = one_second * 60;
+constexpr uint32 one_hour = one_minute * 60;
+constexpr uint32 one_day = one_hour * 24;
 
-//////////////////////////////////////////////////////////////////////
+message_t msg;
 
 void send_time_to_stm32()
 {
     struct timespec t;
     clock_gettime(CLOCK_REALTIME, &t);
     t.tv_sec += clock_timezone_offset();
-    message_t m;
-    clock_options_t options;
-    options.options = 0;
-    init_message(&m, (t.tv_sec) * 1000llu + (t.tv_nsec / 1000000llu), options);
-    ESP_LOGI(TAG, "S: %ld, N: %ld, TS: %lld", t.tv_sec, t.tv_nsec, m.msg.timestamp);
-    uart_write_bytes(UART_NUM_1, reinterpret_cast<char const *>(&m), sizeof(message_t));
+
+    uint32 daytime = t.tv_sec % one_day;
+    uint32 hours = daytime / one_hour;
+    uint32 minutes = (daytime % one_hour) / 60;
+    uint32 seconds = daytime % 60;
+
+    msg.digit[0] = '0' + (hours / 10);
+    msg.digit[1] = '0' + (hours % 10);
+    msg.digit[2] = '0' + (minutes / 10);
+    msg.digit[3] = '0' + (minutes % 10);
+    msg.digit[4] = '0' + (seconds / 10);
+    msg.digit[5] = '0' + (seconds % 10);
+    msg.digit[6] = 'A';
+    msg.seconds = seconds;
+    msg.signature = 0xDA5C;
+
+    msg.crc = crc16(&msg, sizeof(msg) - 2);    // crc must be last 16 bits of msg struct
+
+    uart_write_bytes(UART_NUM_1, reinterpret_cast<char const *>(&msg), sizeof(message_t));
 }
 
 //////////////////////////////////////////////////////////////////////
