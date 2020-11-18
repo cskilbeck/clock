@@ -87,6 +87,8 @@ int buffer = 0;
 
 int ambient_light = 0;
 int ambient_scale = 65535;
+int ambient_target = 65535;
+int user_brightness = 63;
 
 // frame timer sets this to 1, main process reads/clears it
 volatile int vblank = 0;
@@ -130,21 +132,21 @@ void set_ascii(int digit, int c, uint16 b = 1023)
 
 void set_digit(int digit, int number, uint16 b = 1023)
 {
-	if(number > 9) {
-		number += 'A' - 10;
-	} else {
-		number += '0';
-	}
-	set_ascii(digit, number);
+    if(number > 9) {
+        number += 'A' - 10;
+    } else {
+        number += '0';
+    }
+    set_ascii(digit, number);
 }
 
 void set_hex(int start_digit, int value, int num_digits, uint16 b = 1023)
 {
-	int shift = (num_digits - 1) * 4;
-	for(int i=0; i<num_digits; ++i) {
-		set_digit(start_digit++, (value >> shift) & 0xf, b);
-		shift -= 4;
-	}
+    int shift = (num_digits - 1) * 4;
+    for(int i = 0; i < num_digits; ++i) {
+        set_digit(start_digit++, (value >> shift) & 0xf, b);
+        shift -= 4;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -221,10 +223,10 @@ void led_data_init()
 ////////////////////////////////////////////////////////////////////////////////
 // pack uint16 brightness values into 12 bit buffer (3 nibbles each)
 
-void frame_update(uint16 *brightness, byte *spi_data)
-{
+void update_display()
+{    
     uint16 *b = brightness;
-    uint8 *p = spi_data;
+    uint8 *p = spi_data[buffer];
     // 8 columns
     for(int i = 0; i < 8; ++i) {
         p += 1;    // 1st 7 bits are spilled, 8th bit is the TLC_SETCONFIG, data starts after that
@@ -237,7 +239,7 @@ void frame_update(uint16 *brightness, byte *spi_data)
             // scale for ambience
             brt1 = (brt1 * ambient_scale) >> 16;
             brt2 = (brt2 * ambient_scale) >> 16;
-            
+
             // squared for ghetto gamma ramp
             brt1 = (brt1 * brt1) >> 10;
             brt2 = (brt2 * brt2) >> 10;
@@ -296,110 +298,97 @@ extern "C" void DMA1_Channel1_IRQHandler()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// kick off serial read from esp12
 
-byte uart_buffer[64];
-
-void serial_read()
+uint16 init_crc()
 {
-	LL_USART_DisableRxTimeout(USART1);
-	LL_USART_ClearFlag_RTO(USART1);
-    LL_DMA_SetPeriphAddress(DMA1, LL_DMA_CHANNEL_2, (uint32_t)&USART1->RDR);
-    LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_2, (uint32_t)uart_buffer);
-    LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_2, util::countof(uart_buffer));
-	LL_USART_EnableDMAReq_RX(USART1);
-    LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_2);
-
-	NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
-	NVIC_EnableIRQ(USART1_IRQn);
-	
-	LL_USART_EnableIT_IDLE(USART1);
-	LL_DMA_EnableIT_HT(DMA1, LL_DMA_CHANNEL_2);
-	LL_DMA_EnableIT_TC(DMA1, LL_DMA_CHANNEL_2);
+    return 0xffff;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
-char const banner[16 + 1] = "HELLOSAILORWORLD";
-
-volatile bool got_serial_data = false;
-
-volatile uint32 new_pos = 0;
-uint32 old_pos = 0;
-
-message_t last_msg;
-
-byte &uart_byte(int offset)
+uint16 update_crc(uint16 cur_crc, byte b)
 {
-	return uart_buffer[offset & 63];
+    uint16 x = (cur_crc >> 8) ^ b;
+    x ^= x >> 4;
+    cur_crc = (cur_crc << 8) ^ (x << 12) ^ (x << 5) ^ x;
+    return cur_crc;
 }
 
-bool check_word(int offset, uint16 x)
-{
-	byte lo = x & 0xff;
-	byte hi = x >> 8;
-	return uart_byte(offset) == lo && uart_byte(offset + 1) == hi;
-}
+uint16 crc;
 
-bool validate_message(int start)
+enum
 {
-	if(!check_word(start + offsetof(message_t, signature), 0xDA5C)) {
-		return false;
-	}
-	
-    uint16 crc = 0xffff;
-	
-	int end = start + offsetof(message_t, crc);
-	
-	byte *msg_ptr = reinterpret_cast<byte *>(&last_msg);
-    for(int i = start; i != end; ++i) {
-		byte b = uart_byte(i);
-		*msg_ptr++ = b;
-        uint16 x = (crc >> 8) ^ b;
-        x ^= x >> 4;
-        crc = (crc << 8) ^ (x << 12) ^ (x << 5) ^ x;
+    ss_idle = 0,
+    ss_sig1 = 1,
+    ss_sig2 = 2,
+    ss_get_len = 3,
+    ss_get_body = 4,
+    ss_get_crc1 = 5,
+    ss_get_crc2 = 6
+};
+
+int ss_state;
+int ss_len;
+int ss_got;
+uint16 ss_crc;
+volatile byte ss_msg_type;
+byte ss_buffer[16];
+
+volatile byte msg_type_received;
+
+void on_serial_byte(byte b)
+{
+    switch(ss_state) {
+    case ss_idle:
+        switch(b) {
+            case control_message_signature:
+            case clock_message_signature:
+                ss_state = ss_get_len;
+                ss_msg_type = b;
+        }
+        break;
+    case ss_get_len:
+        if(b < 4 || b > 8) {    // min/max msg size
+            ss_state = ss_idle;
+        } else {
+            crc = init_crc();
+            ss_len = b;
+            ss_got = 0;
+            ss_state = ss_get_body;
+        }
+        break;
+    case ss_get_body:
+        ss_buffer[ss_got++] = b;
+        crc = update_crc(crc, b);
+        if(ss_got == ss_len) {
+            ss_state = ss_get_crc1;
+        }
+        break;
+    case ss_get_crc1:
+        ss_crc = b;
+        ss_state = ss_get_crc2;
+        break;
+    case ss_get_crc2:
+        ss_crc |= b << 8;
+        if(ss_crc == crc) {
+            msg_type_received = ss_msg_type;
+        }
+        ss_state = ss_idle;
+        break;
     }
-    return check_word(start + offsetof(message_t, crc), crc);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// some bytes have arrived on the serial port, notify main loop
-
-void process_serial()
-{
-	int p = util::countof(uart_buffer) - LL_DMA_GetDataLength(DMA1, LL_DMA_CHANNEL_2);
-	if(p != old_pos) {
-		got_serial_data = true;
-		new_pos = p;
-	}
-	old_pos = p;
-	if(old_pos == util::countof(uart_buffer)) {
-		old_pos = 0;
-	}
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-extern "C" void DMA1_Channel2_3_IRQHandler()
-{
-	if(LL_DMA_IsActiveFlag_TC2(DMA1)) {
-		LL_DMA_ClearFlag_TC2(DMA1);
-		process_serial();
-	}
-	if(LL_DMA_IsActiveFlag_HT2(DMA1)) {
-		LL_DMA_ClearFlag_HT2(DMA1);
-		process_serial();
-	}
-}
-
-////////////////////////////////////////////////////////////////////////////////
+// a byte arrived on the uart - process it
+// or the uart went idle - reset the uart state
 
 extern "C" void USART1_IRQHandler()
 {
-	if(LL_USART_IsActiveFlag_IDLE(USART1)) {
-		LL_USART_ClearFlag_IDLE(USART1);
-		process_serial();
-	}
+    if(LL_USART_IsActiveFlag_RXNE_RXFNE(USART1)) {      // a byte arrived, process it
+        on_serial_byte(static_cast<byte>(USART1->RDR)); // reading RDR clears the IRQ
+    }
+    if(LL_USART_IsActiveFlag_IDLE(USART1)) {
+        LL_USART_ClearFlag_IDLE(USART1);    // for IDLE, clear the iRQ manually
+        ss_state = ss_idle;                 // and reset the state machine
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -437,17 +426,49 @@ extern "C" void SysTick_Handler()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Frame updaters
 
-void test()
+uint32 last_second_ticks = 0;
+int current_second = 0;
+
+uint32 second_ticks()    // 0..1023 = 1 second
 {
+    return ticks - last_second_ticks;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void intro()
+typedef void (*display_handler)();
+
+void display_intro();
+void display_fade();
+void display_clock();
+void display_test();
+
+display_handler current_display_handler = display_intro;
+uint32 display_handler_timestamp;   // ticks when display_handler was last changed
+
+////////////////////////////////////////////////////////////////////////////////
+
+uint32 handler_time()
 {
-    int f = frames & 8191;
+    return ticks - display_handler_timestamp;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void set_display_handler(display_handler h)
+{
+    display_handler_timestamp = ticks;
+    current_display_handler = h;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void display_intro()
+{
+    memset(brightness, 0, sizeof(brightness));
+    int ht = handler_time();
+    int f = (ht << 2) & 8191;
     int pos = (f * (f >> 3)) >> 13;
     int tail_scale = 1024 / (util::min(1023, (f * (f * 11)) >> 20) + 1);
     int head = 1023;
@@ -465,84 +486,181 @@ void intro()
     }
     ambient_scale = 0xffff;
     set_global_brightness(127);
+
+    if(ht > 1023) {
+        set_display_handler(display_fade);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void fade()
+void display_fade()
 {
-    int f = 1024 - (frames - (5 * 1024));
+    int ht = handler_time();
+    int f = 1024 - ht;
     f = (f * f) >> 10;
     for(int i = 0; i < 60; ++i) {
         brightness[minutes_map[i]] = f;
     }
     ambient_scale = 0xffff;
     set_global_brightness(127);
+    
+    if(ht > 1023) {
+        set_display_handler(display_clock);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void clock()
+char digit[7];
+
+void display_clock()
 {
-    int seconds = (ticks >> 10) + 42 + (60 * 23) + (3600 * 20);
-    int hours = (seconds / 3600) % 12;
-    int minutes = (seconds / 60) % 60;
+    int sec_ticks = second_ticks();
 
-    int secs = seconds % 60;
-
-    for(int i = 0; i < 12; ++i) {
-        brightness[hours_map[i]] = 192;
+    for(int i = 0; i < 7; ++i) {
+        set_ascii(i, digit[i]);
     }
-
-    for(int i = 0; i < secs; ++i) {
+    for(int i = 0; i <= current_second; ++i) {
         brightness[minutes_map[i]] = 256;
     }
-    brightness[minutes_map[secs]] = (util::min(1023u, (ticks & 1023) * 1) * 1) >> 2;
-    for(int i = secs + 1; i < 60; ++i) {
+    for(int i = current_second + 1; i < 60; ++i) {
         brightness[minutes_map[i]] = 0;
     }
+    for(int i = 0; i < 12; ++i) {
+        brightness[hours_map[i]] = 256;
+    }
 
-    //set_digit(0, hours / 10);
-    set_digit(0, 0);
-    set_digit(1, hours % 10);
-    set_digit(2, minutes / 10);
-    set_digit(3, minutes % 10);
-//    set_digit(4, secs / 10, 620);
-//    set_digit(5, secs % 10, 620);
-    set_digit(6, 'P', 900);
-    
-    uint flash = util::abs(((int)(ticks + 573) & 1023) - 512);
-    flash = util::min(1023u, flash << 3) >> 2;
-    flash = 256;
+    brightness[minutes_map[current_second]] = util::min(255, sec_ticks >> 2);
 
+    uint flash = 0;
+
+    colon_flash_mode colon_mode = colon_flash_mode::solid;    // colon_flash_mode(last_msg.colon_flash_mode);
+    switch(colon_mode) {
+    case colon_flash_mode::off:
+        flash = 0;
+        break;
+    case colon_flash_mode::pulse:
+        flash = util::abs(((int)(sec_ticks + 573) & 1023) - 512);
+        flash = util::min(1023u, flash << 3) >> 2;
+        break;
+    case colon_flash_mode::flash:
+        flash = ((sec_ticks >> 9) & 1) << 9;
+        break;
+    case colon_flash_mode::solid:
+        flash = 512;
+        break;
+    }
     brightness[colon_map[0]] = flash;
     brightness[colon_map[1]] = flash;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-typedef void (*const update_function_t)();
+void display_test()
+{
+    ambient_scale = 0xffff;
+    set_global_brightness(127);
 
-// index into this table at frames / 1024
-// so
-//  intro 0..4   (0    .. 5119 )
-//  fade  5      (5120 .. 6143 )
-//  clock 6      (6144 ..      )
+    for(int i=0; i<128; ++i) {
+        brightness[i] = 1023;
+    }
+    if(handler_time() > 1024) {
+        set_display_handler(display_clock);
+    }
+}
 
-update_function_t update_function[] = {
-#if 1
-    test
-#else
-    intro, intro, intro, intro, intro, fade, clock
-#endif
-};
+////////////////////////////////////////////////////////////////////////////////
+
+void do_display()
+{
+    (current_display_handler)();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+template<typename T> void process_message(T const &m)
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+template <> void process_message<control_message_t>(control_message_t const &m)
+{
+    set_display_handler(display_test);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+template <> void process_message<clock_message_t >(clock_message_t const &m)
+{
+    last_second_ticks = ticks;
+    current_second = m.seconds;
+    memcpy(digit, m.digit, 7);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+template <typename T> void handle_message()
+{
+    process_message<T>(*reinterpret_cast<T const *>(ss_buffer));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void update_clock()
+{
+    if(msg_type_received != 0) {
+        switch(msg_type_received) {
+        case control_message_signature:
+            handle_message<control_message_t>();
+            break;
+        case clock_message_signature:
+            handle_message<clock_message_t>();
+            break;
+        }
+        msg_type_received = 0;
+    }
+    do_display();
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 void delay(int t)
 {
-	int n = ticks + t;
-	for(int i=ticks; i<t; ++i) {
-		__NOP();
-	}
+    int n = ticks + t;
+    for(int i = ticks; i < t; ++i) {
+        __NOP();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void update_ambient()
+{
+    // wait for ADC reading to complete (which it will have done ages ago)
+    while(LL_ADC_REG_IsConversionOngoing(ADC1) != 0) {
+        __nop();
+    }
+
+    // read ambient light ADC
+    int adc = LL_ADC_REG_ReadConversionData12(ADC1);
+
+    int const ambient_update_speed = 4;
+    // high pass filter the ambient_light
+    ambient_light = ((ambient_light * 31) >> 5) + adc;
+    ambient_target = ((ambient_light * 100) >> 5) + 8192;
+    if(ambient_target > 65535) {
+        ambient_target = 65535;
+    }
+    int scaled_ambient = (ambient_target * user_brightness) >> 6;
+    if(ambient_scale < scaled_ambient) {
+        ambient_scale = util::min(ambient_scale + ambient_update_speed, scaled_ambient);
+    }
+    if(ambient_scale > scaled_ambient) {
+        ambient_scale = util::max(ambient_scale - ambient_update_speed, scaled_ambient);
+    }
+    set_global_brightness((ambient_scale * user_brightness) >> (9 + 6));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -581,19 +699,20 @@ extern "C" void user_main()
 
     LL_ADC_Enable(ADC1);
 
-    uint32 ambient = 0;
-    uint32 ambient_target = 0;
-
     // enable PWM clock
     TIM14->CR1 |= TIM_CR1_CEN;
 
     // enable 3-8 mux
     GPIOA->BSRR = 1 << 3;
-	
-	delay(100000);
-	
-	serial_read();
-	
+
+    // kick off serial read from esp12
+    LL_USART_DisableRxTimeout(USART1);
+    LL_USART_ClearFlag_RTO(USART1);
+    LL_USART_EnableIT_RXNE(USART1);
+    LL_USART_EnableIT_IDLE(USART1);
+    NVIC_SetPriority(USART1_IRQn, 0xff);    // lowest priority for uart irq
+    NVIC_EnableIRQ(USART1_IRQn);
+
     while(1) {
 
         // kick off ADC for ambient light sensor
@@ -606,50 +725,8 @@ extern "C" void user_main()
         vblank = 0;
         frames += 1;
 
-        // wait for ADC reading to complete (which it will have done ages ago)
-        while(LL_ADC_REG_IsConversionOngoing(ADC1) != 0) {
-            __nop();
-        }
-
-		if(got_serial_data) {
-			got_serial_data = false;
-			int msg_start = ((int)new_pos - sizeof(message_t)) & 63;
-			if(validate_message(msg_start)) {
-				
-				uart_byte(msg_start + offsetof(message_t, crc)) = 0;	// nobble the crc so we don't mistakenly interpret this as a new message any time soon
-
-				// we have a valid message
-				
-				message_t const &m = last_msg;
-				for(int i=0; i<7; ++i) {
-					set_ascii(i, m.digit[i]);
-				}
-				for(int i = 0; i <= m.seconds; ++i) {
-					brightness[minutes_map[i]] = 256;
-				}
-				//brightness[minutes_map[m.seconds]] = (util::min(1023u, (ticks & 1023) * 1) * 1) >> 2;
-				for(int i = m.seconds + 1; i < 60; ++i) {
-					brightness[minutes_map[i]] = 0;
-				}
-			}
-		}
-
-        // read ambient light ADC
-        int adc = LL_ADC_REG_ReadConversionData12(ADC1);
-
-        // high pass filter the ambient_light
-        ambient_light = ((ambient_light * 31) >> 5) + adc;
-        ambient_scale = ((ambient_light * 100) >> 5) + 8192;
-        if(ambient_scale > 65535) {
-            ambient_scale = 65535;
-        }
-
-        set_global_brightness(ambient_scale >> 9);
-		
-        // update frame buffer
-
-        uint f = frames >> 10;
-        update_function[util::min(util::countof(update_function) - 1, f)]();
-        frame_update(brightness, spi_data[buffer]);
+        update_ambient();
+        update_clock();
+        update_display();
     }
 }

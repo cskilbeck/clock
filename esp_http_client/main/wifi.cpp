@@ -126,7 +126,7 @@ namespace
             memset(&wifi_config, 0, sizeof(wifi_config));
             esp_err_t r = esp_wifi_get_config(ESP_IF_WIFI_STA, &wifi_config);
             if(r == ESP_OK && wifi_config.sta.ssid[0] != 0 && wifi_config.sta.password[0] != 0) {
-                ESP_LOGI(TAG, "GOT CONFIG: ssid: %s, password: %s", wifi_config.sta.ssid, wifi_config.sta.password);
+                ESP_LOGV(TAG, "GOT CONFIG: ssid: %s, password: %s", wifi_config.sta.ssid, wifi_config.sta.password);
                 ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
                 ESP_ERROR_CHECK(esp_wifi_connect());
                 xTaskCreate(wifi_client_task, "wifi_client_task", 2048, NULL, 1, NULL);

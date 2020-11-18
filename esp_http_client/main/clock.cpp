@@ -17,6 +17,10 @@
 #include "esp_http_client.h"
 #include "nvs_flash.h"
 #include "driver/uart.h"
+#include "driver/gpio.h"
+#include "esp8266/eagle_soc.h"
+#include "esp8266/pin_mux_register.h"
+#include "esp8266/gpio_struct.h"
 
 #include "types.h"
 #include "util.h"
@@ -29,6 +33,11 @@
 
 #define MAX_HTTP_RECV_BUFFER 512
 #define STM32_MSG_BUF_SIZE 128
+
+#define BTN1_POS GPIO_NUM_13
+#define BTN2_POS GPIO_NUM_14
+#define BTN1_MASK (1 << BTN1_POS)
+#define BTN2_MASK (1 << BTN2_POS)
 
 static char const *TAG = "CLOCK";
 
@@ -178,16 +187,6 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 }
 
 //////////////////////////////////////////////////////////////////////
-// setup sntp
-
-void sntp_task(void *)
-{
-    while(true) {
-        vTaskDelay((1000 * 60 * 60) / portTICK_PERIOD_MS);
-    }
-}
-
-//////////////////////////////////////////////////////////////////////
 // format a time_t into a string
 
 void time_to_str(time_t t, char *buf)
@@ -215,20 +214,6 @@ char const *current_time(char *buffer)
     now += clock_timezone_offset();
     time_to_str(now, buffer);
     return buffer;
-}
-
-//////////////////////////////////////////////////////////////////////
-// send STM32 message with current time & options
-
-void clock_draw(uint32 fg_color, uint32 bg_color)
-{
-    char buffer[40];
-    char const *time_string = "--:--";
-    if(get_clock_state() == clock_state_ready) {
-        current_time(buffer);
-        time_string = buffer;
-    }
-    ESP_LOGI(TAG, "TIME: %s", time_string);
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -397,18 +382,52 @@ bool is_sntp_working()
 //////////////////////////////////////////////////////////////////////
 // calculate a crc for an stm32 message
 
-uint16 crc16(message_t const *m, size_t l)
+uint16 crc16(byte const *p, size_t len)
 {
+    assert(len != 0);
     uint16 crc = 0xffff;
-    byte const *p = reinterpret_cast<byte const *>(m);
-    byte const *e = p + l;
-    for(; p < e; ++p) {
+    byte const *e = p + len;
+    do {
         uint16 x = (crc >> 8) ^ *p;
         x ^= x >> 4;
         crc = (crc << 8) ^ (x << 12) ^ (x << 5) ^ x;
-    }
+    } while(++p < e);
     return crc;
 }
+
+//////////////////////////////////////////////////////////////////////
+
+inline size_t get_message_length(uint16 signature)
+{
+    switch(signature) {
+    case clock_message_signature:
+        return sizeof(clock_message_t);
+    case control_message_signature:
+        return sizeof(control_message_t);
+    default:
+        return 0;
+    }
+}
+
+//////////////////////////////////////////////////////////////////////
+
+template <typename T> void set_crc(T &msg)
+{
+    msg.crc = crc16(reinterpret_cast<byte const *>(&msg) + 4, sizeof(T) - 4);
+}
+
+EventGroupHandle_t message_events;
+
+enum event_bits : uint32
+{
+    send_control = 1,    // please send the control message
+    sent_control = 2,    // I sent it
+    send_clock = 4,      // please send the clock message
+    sent_clock = 8       // I sent it
+};
+
+control_message_t control_message;
+clock_message_t clock_msg;
 
 //////////////////////////////////////////////////////////////////////
 
@@ -416,8 +435,6 @@ constexpr uint32 one_second = 1;
 constexpr uint32 one_minute = one_second * 60;
 constexpr uint32 one_hour = one_minute * 60;
 constexpr uint32 one_day = one_hour * 24;
-
-message_t msg;
 
 void send_time_to_stm32()
 {
@@ -430,47 +447,110 @@ void send_time_to_stm32()
     uint32 minutes = (daytime % one_hour) / 60;
     uint32 seconds = daytime % 60;
 
-    msg.digit[0] = '0' + (hours / 10);
-    msg.digit[1] = '0' + (hours % 10);
-    msg.digit[2] = '0' + (minutes / 10);
-    msg.digit[3] = '0' + (minutes % 10);
-    msg.digit[4] = '0' + (seconds / 10);
-    msg.digit[5] = '0' + (seconds % 10);
-    msg.digit[6] = 'A';
-    msg.seconds = seconds;
-    msg.signature = 0xDA5C;
+    if(hours > 12) {
+        hours -= 12;
+    }
+    if(hours == 0) {
+        hours = 12;
+    }
 
-    msg.crc = crc16(&msg, sizeof(msg) - 2);    // crc must be last 16 bits of msg struct
+    if(hours > 9) {
+        clock_msg.digit[0] = '0' + (hours / 10);
+    } else {
+        clock_msg.digit[0] = 0;
+    }
 
-    uart_write_bytes(UART_NUM_1, reinterpret_cast<char const *>(&msg), sizeof(message_t));
+    clock_msg.digit[1] = '0' + (hours % 10);
+
+    clock_msg.digit[2] = '0' + (minutes / 10);
+    clock_msg.digit[3] = '0' + (minutes % 10);
+
+    // clock_msg.digit[4] = '0' + (seconds / 10);
+    // clock_msg.digit[5] = '0' + (seconds % 10);
+    clock_msg.digit[4] = 0;
+    clock_msg.digit[5] = 0;
+
+    clock_msg.digit[6] = 0;    //'A';
+
+    clock_msg.seconds = seconds;
+
+    xEventGroupSync(message_events, send_clock, sent_clock, portMAX_DELAY);
 }
 
 //////////////////////////////////////////////////////////////////////
 
-void do_clock()
+void button_task(void *)
 {
-    initialise_wifi();
+    static char const *TAG = "BTN";
 
-    clock_state = clock_state_idle;
-    ESP_LOGI(TAG, "Clock task begins");
-    wifi_wait_until(wifi_event_connected, portMAX_DELAY);
+    gpio_config_t io_conf;
+    io_conf.intr_type = GPIO_INTR_ANYEDGE;
+    io_conf.pin_bit_mask = BTN1_MASK | BTN2_MASK;
+    io_conf.mode = GPIO_MODE_INPUT;
+    io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
+    gpio_config(&io_conf);
 
-    clock_state = clock_state_initializing;
-    ESP_LOGI(TAG, "Wifi connected, getting time and timezone");
+    int button_state = 0;
+    while(true) {
+        uint32 gpio = GPIO.in;
+        int btn1 = 1 - ((gpio & BTN1_MASK) >> BTN1_POS);
+        int btn2 = 2 - ((gpio & BTN2_MASK) >> (BTN2_POS - 1));
+        int new_button_state = btn1 | btn2;
+        int button_change = new_button_state ^ button_state;
+        button_state = new_button_state;
+        int button_press = button_change & button_state;
+        int button_release = button_change & ~button_state;
 
-    // init sntp
+        if(button_press & 2) {
+            control_message.brightness = min(63, control_message.brightness + 1);
+        }
+        if(button_press & 1) {
+            control_message.brightness = max(1, control_message.brightness - 1);
+        }
+
+        if(button_press || button_release) {
+            // whole big menu handler here
+            ESP_LOGI(TAG, "press: %d, release: %d, buttons = %d", button_press, button_release, button_state);
+            xEventGroupSync(message_events, send_control, sent_control, portMAX_DELAY);
+        }
+        vTaskDelay(1);    // delay for 10ms
+    }
+}
+
+//////////////////////////////////////////////////////////////////////
+
+void start_sntp()
+{
+    static char const *TAG = "SNTP";
+
+    ESP_LOGI(TAG, "Init SNTP");
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
     sntp_setservername(0, const_cast<char *>("pool.ntp.org"));
     wifi_wait_until(wifi_event_connected, portMAX_DELAY);
     sntp_init();
+}
 
-    if(get_location() != ESP_OK) {
-        ESP_LOGE(TAG, "Can't get IP/Location/Timezone");
+//////////////////////////////////////////////////////////////////////
+
+template <typename T> void send_message(T &msg, uint32 got_bits, uint32 send_bit, uint32 sent_bit)
+{
+    if(got_bits & send_bit) {
+        constexpr int len = sizeof(T) + 4;
+        byte buffer[len];
+        buffer[0] = T::signature;
+        buffer[1] = sizeof(T);
+        memcpy(buffer + 2, &msg, sizeof(msg));
+        uint16 crc = crc16((byte const *)&msg, sizeof(msg));
+        buffer[len - 2] = crc & 0xff;
+        buffer[len - 1] = crc >> 8;
+        uart_write_bytes(UART_NUM_1, (char const *)buffer, len);
+        ESP_LOGV(TAG, "SENT: %d (%02x%02x ... %02x%02x)", len, buffer[0], buffer[1], buffer[len - 2], buffer[len - 1]);
+        xEventGroupSetBits(message_events, sent_bit);
     }
+}
 
-    ESP_LOGI(TAG, "Clock init complete");
-    clock_state = clock_state_ready;
-
+void message_task(void *)
+{
     // setup uart1 for sending stm32 messages
     uart_config_t uart_config = { .baud_rate = 115200,
                                   .data_bits = UART_DATA_8_BITS,
@@ -482,11 +562,74 @@ void do_clock()
     uart_driver_install(UART_NUM_1, STM32_MSG_BUF_SIZE * 2, 0, 0, NULL, 0);
 
     while(true) {
+        uint32 requests = xEventGroupWaitBits(message_events, send_control | send_clock, pdTRUE, pdFALSE, portMAX_DELAY);
+        send_message(control_message, requests, send_control, sent_control);
+        send_message(clock_msg, requests, send_clock, sent_clock);
+    }
+}
+
+//////////////////////////////////////////////////////////////////////
+
+void do_clock()
+{
+    // this event group is used to request and notify that
+    // messages are sent to the stm32 over the uart
+    // two bits per message so up to 16 types of message, just 2 used for now (control, clock)
+    message_events = xEventGroupCreate();
+
+    // this task does the actual sending
+    xTaskCreate(message_task, "message_sender", 2048, null, 20, null);
+
+    // the button handler task might send some control messages
+    xTaskCreate(button_task, "button_task", 2048, NULL, 10, NULL);
+
+    // add other message senders here, can't think what they might be
+
+    // then this current task becomes the clock task which sends clock_message_t messages
+    initialise_wifi();
+
+    clock_state = clock_state_idle;
+    ESP_LOGI(TAG, "Clock task begins");
+    wifi_wait_until(wifi_event_connected, portMAX_DELAY);
+
+    clock_state = clock_state_initializing;
+    ESP_LOGI(TAG, "Wifi connected, getting time and timezone");
+
+    // init sntp
+    start_sntp();
+
+    if(get_location() != ESP_OK) {
+        ESP_LOGE(TAG, "Can't get IP/Location/Timezone");
+    }
+
+    ESP_LOGI(TAG, "Clock init complete");
+    clock_state = clock_state_ready;
+
+    bool notify = true;
+    int sntp_patience = 30;
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    while(true) {
         if(is_sntp_working()) {
             send_time_to_stm32();
+            if(notify) {
+                ESP_LOGI(TAG, "Got SNTP connection, clock is running");
+                notify = false;
+            }
         } else {
             ESP_LOGI(TAG, "Waiting for SNTP");
+            sntp_patience -= 1;
+            if(sntp_patience == 0) {
+
+                // if SNTP doesn't start after about a minute then
+                // we've probably been connected to a duff server
+                // so reboot the SNTP client and hope for a different one
+                ESP_LOGI(TAG, "SNTP patience exhausted, restarting it");
+                sntp_stop();
+                sntp_init();
+                sntp_patience = 60;
+            }
         }
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        // wait until some time before next second so next one arrives on the second
+        vTaskDelayUntil(&xLastWakeTime, 1000 / portTICK_PERIOD_MS);
     }
 }

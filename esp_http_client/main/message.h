@@ -3,40 +3,66 @@
 //////////////////////////////////////////////////////////////////////
 // clock display options
 
-enum colon_flash_mode
+enum colon_flash_mode : int
 {
-    none = 0,
-    flash = 1,
-    flash_fast = 2,
+    off = 0,
+    solid = 1,
+    flash = 2,
     pulse = 3
 };
 
-//////////////////////////////////////////////////////////////////////
-// STM32 message payload, 128 bits
-
-struct message_t
+enum hours_mode : int
 {
-    // 0..7
+    hours_24 = 0,
+    hours_12 = 1
+};
+
+//////////////////////////////////////////////////////////////////////
+
+// first 3 bytes are signature (16 bits) len (8 bits)
+// then message
+// then crc (16 bits)
+
+
+#define clock_message_signature 0xDC
+#define control_message_signature 0xDD
+
+//////////////////////////////////////////////////////////////////////
+// clock_message_t - what to display as time.
+// guaranteed to arrive 1 second apart so the stm32 can use this
+// to synchronize effects which happen between seconds (fading etc)
+
+struct clock_message_t
+{
+    enum
+    {
+        signature = clock_message_signature
+    };
+
     uint8 digit[7];    // ascii
     uint8 seconds;     // seconds tickmark count
+};
 
-    // 8..9
+//////////////////////////////////////////////////////////////////////
+// control_message_t - control display options
+// Not synchronized with anything, might disrupt the clock timing
+// temporarily, but not by much
+
+struct control_message_t
+{
+    enum
+    {
+        signature = control_message_signature
+    };
+
     uint16 brightness : 6;          // 64 levels of brightness
-    uint16 colon_flash_mode : 2;    // see colon_flash_mode enum
     uint16 digits_enabled : 7;      // which digits enabled
+    uint16 colon_flash_mode : 2;    // see colon_flash_mode enum
     uint16 hours_12_24 : 1;         // 12/24 hour time format
 
-    // 10..11
     uint16 show_seconds : 1;       // seconds digits on or off
     uint16 soft_seconds : 1;       // fade in the second tickmarks
     uint16 show_hour_ticks : 1;    // turn hour ticks on or off
     uint16 test_display : 1;       // switch on all the leds at full brightness
-
-    // 12..13
-    uint16 signature;    // must be 0xDA5C
-
-    // 14..15
-    uint16 crc;    // must be last - see crc16()
+    uint16 pad : 12;
 };
-
-static_assert(sizeof(message_t) == 16, "Message must be 128 bits");
