@@ -5,6 +5,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <utility>
+#include <type_traits>
 
 #include <sys/timeb.h>
 
@@ -395,86 +396,46 @@ uint16 crc16(byte const *p, size_t len)
     return crc;
 }
 
-//////////////////////////////////////////////////////////////////////
+// and with copy to somewhere else
 
-inline size_t get_message_length(uint16 signature)
+uint16 crc16_copy(byte const *p, byte *dst, size_t len)
 {
-    switch(signature) {
-    case clock_message_signature:
-        return sizeof(clock_message_t);
-    case control_message_signature:
-        return sizeof(control_message_t);
-    default:
-        return 0;
-    }
+    assert(len != 0);
+    uint16 crc = 0xffff;
+    byte const *e = p + len;
+    do {
+        byte c = *p;
+        uint16 x = (crc >> 8) ^ c;
+        x ^= x >> 4;
+        crc = (crc << 8) ^ (x << 12) ^ (x << 5) ^ x;
+        *dst++ = c;
+    } while(++p < e);
+    return crc;
 }
 
 //////////////////////////////////////////////////////////////////////
-
-template <typename T> void set_crc(T &msg)
-{
-    msg.crc = crc16(reinterpret_cast<byte const *>(&msg) + 4, sizeof(T) - 4);
-}
 
 EventGroupHandle_t message_events;
 
-enum event_bits : uint32
-{
-    send_control = 1,    // please send the control message
-    sent_control = 2,    // I sent it
-    send_clock = 4,      // please send the clock message
-    sent_clock = 8       // I sent it
-};
-
 control_message_t control_message;
-clock_message_t clock_msg;
+clock_message_t clock_message;
 
 //////////////////////////////////////////////////////////////////////
 
-constexpr uint32 one_second = 1;
-constexpr uint32 one_minute = one_second * 60;
-constexpr uint32 one_hour = one_minute * 60;
-constexpr uint32 one_day = one_hour * 24;
+int button_state;
+int button_press;
+int button_release;
 
-void send_time_to_stm32()
+void button_update()
 {
-    struct timespec t;
-    clock_gettime(CLOCK_REALTIME, &t);
-    t.tv_sec += clock_timezone_offset();
-
-    uint32 daytime = t.tv_sec % one_day;
-    uint32 hours = daytime / one_hour;
-    uint32 minutes = (daytime % one_hour) / 60;
-    uint32 seconds = daytime % 60;
-
-    if(hours > 12) {
-        hours -= 12;
-    }
-    if(hours == 0) {
-        hours = 12;
-    }
-
-    if(hours > 9) {
-        clock_msg.digit[0] = '0' + (hours / 10);
-    } else {
-        clock_msg.digit[0] = 0;
-    }
-
-    clock_msg.digit[1] = '0' + (hours % 10);
-
-    clock_msg.digit[2] = '0' + (minutes / 10);
-    clock_msg.digit[3] = '0' + (minutes % 10);
-
-    // clock_msg.digit[4] = '0' + (seconds / 10);
-    // clock_msg.digit[5] = '0' + (seconds % 10);
-    clock_msg.digit[4] = 0;
-    clock_msg.digit[5] = 0;
-
-    clock_msg.digit[6] = 0;    //'A';
-
-    clock_msg.seconds = seconds;
-
-    xEventGroupSync(message_events, send_clock, sent_clock, portMAX_DELAY);
+    uint32 gpio = GPIO.in;
+    int btn1 = 1 - ((gpio & BTN1_MASK) >> BTN1_POS);
+    int btn2 = 2 - ((gpio & BTN2_MASK) >> (BTN2_POS - 1));
+    int new_button_state = btn1 | btn2;
+    int button_change = new_button_state ^ button_state;
+    button_state = new_button_state;
+    button_press = button_change & button_state;
+    button_release = button_change & ~button_state;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -490,16 +451,8 @@ void button_task(void *)
     io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
     gpio_config(&io_conf);
 
-    int button_state = 0;
     while(true) {
-        uint32 gpio = GPIO.in;
-        int btn1 = 1 - ((gpio & BTN1_MASK) >> BTN1_POS);
-        int btn2 = 2 - ((gpio & BTN2_MASK) >> (BTN2_POS - 1));
-        int new_button_state = btn1 | btn2;
-        int button_change = new_button_state ^ button_state;
-        button_state = new_button_state;
-        int button_press = button_change & button_state;
-        int button_release = button_change & ~button_state;
+        button_update();
 
         if(button_press & 2) {
             control_message.brightness = min(63, control_message.brightness + 1);
@@ -510,8 +463,9 @@ void button_task(void *)
 
         if(button_press || button_release) {
             // whole big menu handler here
-            ESP_LOGI(TAG, "press: %d, release: %d, buttons = %d", button_press, button_release, button_state);
-            xEventGroupSync(message_events, send_control, sent_control, portMAX_DELAY);
+            ESP_LOGV(TAG, "press: %d, release: %d, buttons = %d", button_press, button_release, button_state);
+
+            xEventGroupSync(message_events, send_control, control_sent, portMAX_DELAY);
         }
         vTaskDelay(1);    // delay for 10ms
     }
@@ -531,23 +485,55 @@ void start_sntp()
 }
 
 //////////////////////////////////////////////////////////////////////
+// for marshalling messages to the stm32
 
-template <typename T> void send_message(T &msg, uint32 got_bits, uint32 send_bit, uint32 sent_bit)
+template <typename T> struct messenger
 {
-    if(got_bits & send_bit) {
-        constexpr int len = sizeof(T) + 4;
-        byte buffer[len];
-        buffer[0] = T::signature;
-        buffer[1] = sizeof(T);
-        memcpy(buffer + 2, &msg, sizeof(msg));
-        uint16 crc = crc16((byte const *)&msg, sizeof(msg));
-        buffer[len - 2] = crc & 0xff;
-        buffer[len - 1] = crc >> 8;
-        uart_write_bytes(UART_NUM_1, (char const *)buffer, len);
-        ESP_LOGV(TAG, "SENT: %d (%02x%02x ... %02x%02x)", len, buffer[0], buffer[1], buffer[len - 2], buffer[len - 1]);
-        xEventGroupSetBits(message_events, sent_bit);
+    byte const *msg;
+    int len;
+    int signature;
+    uint32 send_req;
+    uint32 sent_ack;
+
+    messenger(T const &m)
+    {
+        msg = (byte const *)&m;
+        len = sizeof(T);
+        signature = T::signature;
+        send_req = T::send_bits;
+        sent_ack = T::sent_bits;
+        if(!std::is_base_of<message_base_t, T>::value) {
+            ESP_LOGE(TAG, "messenger is only for message_base_t derived classes");
+            esp_restart();
+        }
+        if(len > largest_message_size) {
+            ESP_LOGE(TAG, "messenger is angry about the length %d (max is %d)", len, largest_message_size);
+            esp_restart();
+        }
     }
-}
+
+    void update(uint32 got_bits)
+    {
+        if(got_bits & send_req) {
+            byte buf[largest_message_size + 4];
+            buf[0] = signature;
+            buf[1] = len;
+            uint16 crc = crc16_copy(msg, buf + 2, len);
+            buf[len + 2] = crc & 0xff;
+            buf[len + 3] = crc >> 8;
+            uart_write_bytes(UART_NUM_1, (char const *)buf, len + 4);
+            ESP_LOGV(TAG, "SENT: %d (%02x%02x ... %02x%02x)", len, buf[0], buf[1], buf[len + 2], buf[len + 3]);
+            xEventGroupSetBits(message_events, sent_ack);
+        }
+    }
+};
+
+messenger<control_message_t> control_messenger(control_message);
+messenger<clock_message_t> clock_messenger(clock_message);
+
+//////////////////////////////////////////////////////////////////////
+// this waits for signals from client tasks requesting that
+// messages get sent to the stm32
 
 void message_task(void *)
 {
@@ -561,10 +547,12 @@ void message_task(void *)
     uart_param_config(UART_NUM_1, &uart_config);
     uart_driver_install(UART_NUM_1, STM32_MSG_BUF_SIZE * 2, 0, 0, NULL, 0);
 
+    // sit there and send messages as requested
     while(true) {
         uint32 requests = xEventGroupWaitBits(message_events, send_control | send_clock, pdTRUE, pdFALSE, portMAX_DELAY);
-        send_message(control_message, requests, send_control, sent_control);
-        send_message(clock_msg, requests, send_clock, sent_clock);
+
+        control_messenger.update(requests);
+        clock_messenger.update(requests);
     }
 }
 
@@ -582,8 +570,6 @@ void do_clock()
 
     // the button handler task might send some control messages
     xTaskCreate(button_task, "button_task", 2048, NULL, 10, NULL);
-
-    // add other message senders here, can't think what they might be
 
     // then this current task becomes the clock task which sends clock_message_t messages
     initialise_wifi();
@@ -605,16 +591,33 @@ void do_clock()
     ESP_LOGI(TAG, "Clock init complete");
     clock_state = clock_state_ready;
 
-    bool notify = true;
+    bool sntp_log = true;
     int sntp_patience = 30;
     TickType_t xLastWakeTime = xTaskGetTickCount();
+
+    constexpr uint32 one_second = 1;
+    constexpr uint32 one_minute = one_second * 60;
+    constexpr uint32 one_hour = one_minute * 60;
+    constexpr uint32 one_day = one_hour * 24;
+
     while(true) {
         if(is_sntp_working()) {
-            send_time_to_stm32();
-            if(notify) {
+
+            struct timespec t;
+            clock_gettime(CLOCK_REALTIME, &t);
+            uint32 daytime = ((t.tv_sec - 1) + clock_timezone_offset()) % one_day;    // -1, not sure why it's off
+            clock_message.hours = daytime / one_hour;
+            clock_message.minutes = (daytime % one_hour) / 60;
+            clock_message.seconds = daytime % 60;
+            clock_message.milliseconds = t.tv_nsec / 1000000;
+            xEventGroupSync(message_events, send_clock, clock_sent, portMAX_DELAY);
+
+            if(sntp_log) {
                 ESP_LOGI(TAG, "Got SNTP connection, clock is running");
-                notify = false;
+                sntp_log = false;
             }
+
+            vTaskDelayUntil(&xLastWakeTime, 1000 / portTICK_PERIOD_MS);
         } else {
             ESP_LOGI(TAG, "Waiting for SNTP");
             sntp_patience -= 1;
@@ -627,9 +630,10 @@ void do_clock()
                 sntp_stop();
                 sntp_init();
                 sntp_patience = 60;
+                sntp_log = true;
             }
+            // wait until some time before next second so next one arrives on the second
+            vTaskDelayUntil(&xLastWakeTime, 1000 / portTICK_PERIOD_MS);
         }
-        // wait until some time before next second so next one arrives on the second
-        vTaskDelayUntil(&xLastWakeTime, 1000 / portTICK_PERIOD_MS);
     }
 }

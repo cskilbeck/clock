@@ -67,6 +67,21 @@ namespace util
 
 }    // namespace util
 
+//////////////////////////////////////////////////////////////////////
+// get the largest type from a list of types
+
+template <typename... Ts> struct largest_type;
+
+template <typename T> struct largest_type<T>
+{
+    using type = T;
+};
+
+template <typename T, typename U, typename... Ts> struct largest_type<T, U, Ts...>
+{
+    using type = typename largest_type<typename std::conditional<(sizeof(U) <= sizeof(T)), T, U>::type, Ts...>::type;
+};
+
 // position of high bit in a uint32 or -1 if none are set
 #define PIN_POS(X) (util::hi_bit<X>::position)
 

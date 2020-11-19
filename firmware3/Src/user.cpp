@@ -2,6 +2,7 @@
 // dasclock firmware
 
 #include <cstddef>
+#include <type_traits>
 #include "main.h"
 #include "string.h"
 #include "util.h"
@@ -47,6 +48,18 @@ uint8 const minutes_map[60] = {
     50, 49, 48, 79, 78,
     77, 75, 74, 73, 72
 };
+
+// to divide a 6 bit number by 10
+byte div10[64] =
+{
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+    3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+    4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+    5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+    5, 5, 5, 5
+};
 // clang-format on
 
 uint8 const hours_map[12] = { 14, 8, 2, 29, 23, 17, 43, 37, 63, 57, 51, 76 };
@@ -82,7 +95,6 @@ spi_packet *next_spi_packet;
 uint16 brightness[128] = { 0 };
 
 uint32 column = 0;
-int frames = 0;
 int buffer = 0;
 
 int ambient_light = 0;
@@ -95,6 +107,9 @@ volatile int vblank = 0;
 
 // ticks is incremented 1024 times per second
 volatile uint32 ticks = 0;
+
+// this was the mibiseconds last time we got a clock message
+uint32 millis1024;
 
 ////////////////////////////////////////////////////////////////////////////////
 // set one bit of config data in a spi buffer
@@ -140,6 +155,8 @@ void set_digit(int digit, int number, uint16 b = 1023)
     set_ascii(digit, number);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 void set_hex(int start_digit, int value, int num_digits, uint16 b = 1023)
 {
     int shift = (num_digits - 1) * 4;
@@ -161,7 +178,6 @@ void set_decimal_point(int digit, uint16 b)
 void led_data_init()
 {
     buffer = 0;
-    frames = 0;
     vblank = 0;
 
     memset(spi_data, 0, sizeof(spi_data));
@@ -170,7 +186,7 @@ void led_data_init()
     memset(config1, 0, 25);
 
     // pointers into the spi data for the dma handler
-    // 4 spi packets per column:
+    // 4 pointers per column:
     //      0 - set led data
     //      1 - set config0 (blank = 1)
     //      2 - set config1 (blank = 0)
@@ -224,7 +240,7 @@ void led_data_init()
 // pack uint16 brightness values into 12 bit buffer (3 nibbles each)
 
 void update_display()
-{    
+{
     uint16 *b = brightness;
     uint8 *p = spi_data[buffer];
     // 8 columns
@@ -339,10 +355,10 @@ void on_serial_byte(byte b)
     switch(ss_state) {
     case ss_idle:
         switch(b) {
-            case control_message_signature:
-            case clock_message_signature:
-                ss_state = ss_get_len;
-                ss_msg_type = b;
+        case control_message_signature:
+        case clock_message_signature:
+            ss_state = ss_get_len;
+            ss_msg_type = b;
         }
         break;
     case ss_get_len:
@@ -382,8 +398,8 @@ void on_serial_byte(byte b)
 
 extern "C" void USART1_IRQHandler()
 {
-    if(LL_USART_IsActiveFlag_RXNE_RXFNE(USART1)) {      // a byte arrived, process it
-        on_serial_byte(static_cast<byte>(USART1->RDR)); // reading RDR clears the IRQ
+    if(LL_USART_IsActiveFlag_RXNE_RXFNE(USART1)) {         // a byte arrived, process it
+        on_serial_byte(static_cast<byte>(USART1->RDR));    // reading RDR clears the IRQ
     }
     if(LL_USART_IsActiveFlag_IDLE(USART1)) {
         LL_USART_ClearFlag_IDLE(USART1);    // for IDLE, clear the iRQ manually
@@ -428,7 +444,6 @@ extern "C" void SysTick_Handler()
 ////////////////////////////////////////////////////////////////////////////////
 
 uint32 last_second_ticks = 0;
-int current_second = 0;
 
 uint32 second_ticks()    // 0..1023 = 1 second
 {
@@ -445,7 +460,7 @@ void display_clock();
 void display_test();
 
 display_handler current_display_handler = display_intro;
-uint32 display_handler_timestamp;   // ticks when display_handler was last changed
+uint32 display_handler_timestamp;    // ticks when display_handler was last changed
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -504,7 +519,7 @@ void display_fade()
     }
     ambient_scale = 0xffff;
     set_global_brightness(127);
-    
+
     if(ht > 1023) {
         set_display_handler(display_clock);
     }
@@ -512,26 +527,64 @@ void display_fade()
 
 ////////////////////////////////////////////////////////////////////////////////
 
-char digit[7];
+char clock_digits[7];
+uint32 hours;
+uint32 minutes;
+uint32 seconds;
+uint32 millis;
+
+void set_digits()
+{
+    uint32 h0 = div10[hours];
+    uint32 h1 = hours - (h0 * 10);
+    uint32 m0 = div10[minutes];
+    uint32 m1 = minutes - (m0 * 10);
+    uint32 s0 = div10[seconds];
+    uint32 s1 = seconds - (s0 * 10);
+
+    clock_digits[0] = h0 + '0';
+    clock_digits[1] = h1 + '0';
+    clock_digits[2] = m0 + '0';
+    clock_digits[3] = m1 + '0';
+    clock_digits[4] = s0 + '0';
+    clock_digits[5] = s1 + '0';
+}
 
 void display_clock()
 {
-    int sec_ticks = second_ticks();
+    int sec_ticks = second_ticks() + millis1024;
+    while(sec_ticks > 1023) {
+        last_second_ticks += 1024;
+        sec_ticks -= 1024;
+        seconds += 1;
+        if(seconds >= 60) {
+            seconds = 0;
+            minutes += 1;
+            if(minutes >= 60) {
+                minutes = 0;
+                hours += 1;
+                if(hours >= 24) {
+                    hours = 0;
+                }
+            }
+        }
+    }
+    set_digits();
 
     for(int i = 0; i < 7; ++i) {
-        set_ascii(i, digit[i]);
+        set_ascii(i, clock_digits[i]);
     }
-    for(int i = 0; i <= current_second; ++i) {
+    for(int i = 0; i < seconds; ++i) {
         brightness[minutes_map[i]] = 256;
     }
-    for(int i = current_second + 1; i < 60; ++i) {
+    for(int i = seconds + 1; i < 60; ++i) {
         brightness[minutes_map[i]] = 0;
     }
     for(int i = 0; i < 12; ++i) {
         brightness[hours_map[i]] = 256;
     }
 
-    brightness[minutes_map[current_second]] = util::min(255, sec_ticks >> 2);
+    brightness[minutes_map[seconds]] = util::min(255, sec_ticks >> 2);
 
     uint flash = 0;
 
@@ -562,7 +615,7 @@ void display_test()
     ambient_scale = 0xffff;
     set_global_brightness(127);
 
-    for(int i=0; i<128; ++i) {
+    for(int i = 0; i < 128; ++i) {
         brightness[i] = 1023;
     }
     if(handler_time() > 1024) {
@@ -572,14 +625,7 @@ void display_test()
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void do_display()
-{
-    (current_display_handler)();
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-template<typename T> void process_message(T const &m)
+template <typename T> void process_message(T const &m)
 {
 }
 
@@ -592,11 +638,28 @@ template <> void process_message<control_message_t>(control_message_t const &m)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-template <> void process_message<clock_message_t >(clock_message_t const &m)
+template <> void process_message<clock_message_t>(clock_message_t const &m)
 {
+    // we got a clock message
+    // format the digits
+    // and note the millis
+
+    // this time is actually a bit late due to the 115200 serial
+    // time and some overhead for irqs etc so we should add on
+    // some amount before sending it from the esp12
+
+    hours = m.hours;
+    minutes = m.minutes;
+    seconds = m.seconds;
+    millis = m.milliseconds;
+
+    // this was milliseconds in 0..1023 format
+    millis1024 = (millis * 67109) >> 16;    // scale from 0..999 to 0..1023 (kinda)
+
+    // this was when the message was received
     last_second_ticks = ticks;
-    current_second = m.seconds;
-    memcpy(digit, m.digit, 7);
+
+    // later, we use the difference between (ticks - last_second_ticks) + millis1024 to get a new absolute time
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -621,7 +684,7 @@ void update_clock()
         }
         msg_type_received = 0;
     }
-    do_display();
+    (current_display_handler)();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -638,9 +701,9 @@ void delay(int t)
 
 void update_ambient()
 {
-    // wait for ADC reading to complete (which it will have done ages ago)
-    while(LL_ADC_REG_IsConversionOngoing(ADC1) != 0) {
-        __nop();
+    // only if ADC reading is not ongoing (which it won't be)
+    if(LL_ADC_REG_IsConversionOngoing(ADC1) != 0) {
+        return;
     }
 
     // read ambient light ADC
@@ -661,6 +724,8 @@ void update_ambient()
         ambient_scale = util::max(ambient_scale - ambient_update_speed, scaled_ambient);
     }
     set_global_brightness((ambient_scale * user_brightness) >> (9 + 6));
+
+    LL_ADC_REG_StartConversion(ADC1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -713,17 +778,16 @@ extern "C" void user_main()
     NVIC_SetPriority(USART1_IRQn, 0xff);    // lowest priority for uart irq
     NVIC_EnableIRQ(USART1_IRQn);
 
-    while(1) {
+    // kick off ADC for ambient light sensor
+    LL_ADC_REG_StartConversion(ADC1);
 
-        // kick off ADC for ambient light sensor
-        LL_ADC_REG_StartConversion(ADC1);
+    while(1) {
 
         // waitvb
         while(vblank == 0) {
             __WFI();
         }
         vblank = 0;
-        frames += 1;
 
         update_ambient();
         update_clock();
