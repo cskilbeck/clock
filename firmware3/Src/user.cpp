@@ -328,17 +328,13 @@ uint16 update_crc(uint16 cur_crc, byte b)
     return cur_crc;
 }
 
-uint16 crc;
-
 enum
 {
     ss_idle = 0,
-    ss_sig1 = 1,
-    ss_sig2 = 2,
-    ss_get_len = 3,
-    ss_get_body = 4,
-    ss_get_crc1 = 5,
-    ss_get_crc2 = 6
+    ss_get_len = 1,
+    ss_get_crc1 = 2,
+    ss_get_crc2 = 3,
+    ss_get_body = 4
 };
 
 int ss_state;
@@ -347,11 +343,21 @@ int ss_got;
 uint16 ss_crc;
 volatile byte ss_msg_type;
 byte ss_buffer[16];
+uint16 crc_maybe;
 
 volatile byte msg_type_received;
 
+void ss_reset()
+{
+    ss_state = ss_idle;
+    ss_got = 0;
+}
+
 void on_serial_byte(byte b)
 {
+    ss_buffer[ss_got] = b;
+    ss_got = (ss_got + 1) & 15;
+    
     switch(ss_state) {
     case ss_idle:
         switch(b) {
@@ -359,22 +365,17 @@ void on_serial_byte(byte b)
         case clock_message_signature:
             ss_state = ss_get_len;
             ss_msg_type = b;
+            break;
+        default:
+            ss_reset();
         }
         break;
     case ss_get_len:
-        if(b < 4 || b > 8) {    // min/max msg size
-            ss_state = ss_idle;
+        if(b < 8 || b > 16) {    // min/max msg size
+            ss_reset();
         } else {
-            crc = init_crc();
+            crc_maybe = init_crc();
             ss_len = b;
-            ss_got = 0;
-            ss_state = ss_get_body;
-        }
-        break;
-    case ss_get_body:
-        ss_buffer[ss_got++] = b;
-        crc = update_crc(crc, b);
-        if(ss_got == ss_len) {
             ss_state = ss_get_crc1;
         }
         break;
@@ -384,10 +385,17 @@ void on_serial_byte(byte b)
         break;
     case ss_get_crc2:
         ss_crc |= b << 8;
-        if(ss_crc == crc) {
-            msg_type_received = ss_msg_type;
+        ss_state = ss_get_body;
+        break;
+    case ss_get_body:
+        crc_maybe = update_crc(crc_maybe, b);
+        if(ss_len == ss_got) {
+            if(ss_crc == crc_maybe) {
+                msg_type_received = ss_msg_type;
+                ss_reset();
+            }
+            ss_reset();
         }
-        ss_state = ss_idle;
         break;
     }
 }
@@ -403,7 +411,7 @@ extern "C" void USART1_IRQHandler()
     }
     if(LL_USART_IsActiveFlag_IDLE(USART1)) {
         LL_USART_ClearFlag_IDLE(USART1);    // for IDLE, clear the iRQ manually
-        ss_state = ss_idle;                 // and reset the state machine
+        ss_reset();                 // and reset the state machine
     }
 }
 
@@ -584,7 +592,7 @@ void display_clock()
         brightness[hours_map[i]] = 256;
     }
 
-    brightness[minutes_map[seconds]] = util::min(255, sec_ticks >> 2);
+    brightness[minutes_map[seconds]] = util::min(256, sec_ticks >> 0);
 
     uint flash = 0;
 

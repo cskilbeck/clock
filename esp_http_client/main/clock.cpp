@@ -26,405 +26,47 @@
 #include "types.h"
 #include "util.h"
 #include "wifi.h"
+#include "http.h"
 #include "jsmn.h"
 #include "message.h"
+#include "messenger.h"
 #include "clock.h"
+#include "timezone.h"
+#include "ntp.h"
+
+static char const *TAG = "CLOCK";
 
 //////////////////////////////////////////////////////////////////////
 
-#define MAX_HTTP_RECV_BUFFER 512
 #define STM32_MSG_BUF_SIZE 128
+
+//////////////////////////////////////////////////////////////////////
 
 #define BTN1_POS GPIO_NUM_13
 #define BTN2_POS GPIO_NUM_14
 #define BTN1_MASK (1 << BTN1_POS)
 #define BTN2_MASK (1 << BTN2_POS)
 
-static char const *TAG = "CLOCK";
-
-struct http_getter
-{
-    virtual void on_data(byte const *data, size_t len) = 0;
-};
-
-static int gmt_offset = 0;
-
-static clock_state_enum clock_state = clock_state_idle;
-static EventGroupHandle_t clock_event_handle;
-
-struct ip_json
-{
-    char const *url;
-    char const **key;
-    int num_keys;
-
-    int get_key_id(char const *v, int len)
-    {
-        for(int i = 0; i < num_keys; ++i) {
-            int l = strlen(key[i]);
-            if(len == l && strncmp(v, key[i], len) == 0) {
-                return i;
-            }
-        }
-        return -1;
-    }
-};
-
-char const *ip_api_1_key[3] = { "query", "lat", "lon" };
-char const *ip_api_2_key[3] = { "ip", "latitude", "longitude" };
-
-ip_json ip_api_1{ "http://ip-api.com/json?fields=lat,lon,query", ip_api_1_key, countof(ip_api_1_key) };
-ip_json ip_api_2{ "http://api.ipapi.com/api/check?access_key=825b0130e3baced2cdd5eeb07a73953b&fields=ip,latitude,longitude", ip_api_2_key, countof(ip_api_2_key) };
-
-// toggle the ip ones until one works
-ip_json *ip_apis[2] = { &ip_api_1, &ip_api_2 };
-int which_api = 1;
-
-enum
-{
-    key_ip = 0,
-    key_lat,
-    key_lon
-};
-
-static char const timezone_api_url_fmt[] = "http://api.timezonedb.com/v2.1/get-time-zone?key=VV0F65261GPD&by=position&lat=%f&lng=%f&format=json";
-int const json_token_max = 128;
-static jsmntok_t tokens[json_token_max]; /* We expect no more than 128 tokens */
-static char url_buffer[countof(timezone_api_url_fmt) + 40];
+int button_state;
+int button_press;
+int button_release;
 
 //////////////////////////////////////////////////////////////////////
 
-int clock_timezone_offset()
-{
-    return gmt_offset;
-}
+constexpr uint32 one_second = 1;
+constexpr uint32 one_minute = one_second * 60;
+constexpr uint32 one_hour = one_minute * 60;
+constexpr uint32 one_day = one_hour * 24;
 
 //////////////////////////////////////////////////////////////////////
-
-clock_state_enum get_clock_state()
-{
-    return clock_state;
-}
-
-//////////////////////////////////////////////////////////////////////
-// http_getter which just accumulates the content into a buffer
-
-struct http_get : http_getter
-{
-    byte *data = null;
-    size_t capacity = 0;
-    size_t length = 0;
-
-    virtual ~http_get()
-    {
-        release();
-    }
-
-    void init(size_t max_size)
-    {
-        data = new byte[max_size];
-        capacity = max_size;
-        length = 0;
-    }
-
-    void release()
-    {
-        if(data != null) {
-            delete[] data;
-            data = null;
-        }
-    }
-
-    void on_data(byte const *incoming_data, size_t len) override
-    {
-        size_t copy_size = min(len, capacity - length);
-        memcpy(data + length, incoming_data, copy_size);
-        length += copy_size;
-        ESP_LOGV(TAG, "got %d bytes, total so far = %d", len, length);
-    }
-};
-
-//////////////////////////////////////////////////////////////////////
-// http handler, attach a http_getter to the http client
-
-esp_err_t _http_event_handler(esp_http_client_event_t *evt)
-{
-    switch(evt->event_id) {
-
-    case HTTP_EVENT_ERROR:
-        ESP_LOGD(TAG, "HTTP_EVENT_ERROR");
-        break;
-
-    case HTTP_EVENT_ON_CONNECTED:
-        ESP_LOGD(TAG, "HTTP_EVENT_ON_CONNECTED");
-        break;
-
-    case HTTP_EVENT_HEADER_SENT:
-        ESP_LOGD(TAG, "HTTP_EVENT_HEADER_SENT");
-        break;
-
-    case HTTP_EVENT_ON_HEADER:
-        ESP_LOGD(TAG, "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
-        break;
-
-    case HTTP_EVENT_ON_DATA: {
-        ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
-        http_getter *g = reinterpret_cast<http_getter *>(evt->user_data);
-        if(g != null) {
-            g->on_data(reinterpret_cast<byte *>(evt->data), evt->data_len);
-        }
-
-    } break;
-
-    case HTTP_EVENT_ON_FINISH:
-        ESP_LOGD(TAG, "HTTP_EVENT_ON_FINISH");
-        break;
-
-    case HTTP_EVENT_DISCONNECTED:
-        ESP_LOGD(TAG, "HTTP_EVENT_DISCONNECTED");
-        break;
-    }
-    return ESP_OK;
-}
-
-//////////////////////////////////////////////////////////////////////
-// format a time_t into a string
-
-void time_to_str(time_t t, char *buf)
-{
-    int minutes = (t / 60) % 60;
-    int hours = (t / 3600) % 24;
-    char const *am_pm = "PM";
-    if(hours < 12) {
-        am_pm = "AM";
-    }
-    hours %= 12;
-    if(hours == 0) {
-        hours = 12;
-    }
-    sprintf(buf, "%2d:%02d %s", hours, minutes, am_pm);
-}
-
-//////////////////////////////////////////////////////////////////////
-// get current time as a string
-
-char const *current_time(char *buffer)
-{
-    time_t now;
-    time(&now);
-    now += clock_timezone_offset();
-    time_to_str(now, buffer);
-    return buffer;
-}
-
-//////////////////////////////////////////////////////////////////////
-// get the current timezone for a given geolocation
-
-void clock_update_timezone(float lat, float lon)
-{
-    ESP_LOGI(TAG, "Update timezone");
-    int buffer_len = sprintf(url_buffer, timezone_api_url_fmt, lat, lon);
-    ESP_LOGV(TAG, "CLOCK WOULD USE %s (%d)", url_buffer, buffer_len);
-    http_get getter;
-    getter.init(1024);
-    esp_http_client_config_t config;
-    memset(&config, 0, sizeof(config));
-    config.url = url_buffer;
-    config.event_handler = _http_event_handler;
-    config.user_data = &getter;
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-
-    bool success = false;
-
-    esp_err_t err = esp_http_client_perform(client);
-
-    if(err == ESP_OK) {
-        ESP_LOGV(TAG, "Got %d from timezonedb", getter.length);
-        jsmn_parser p;
-        jsmn_init(&p);
-        bool got_offset = false;
-        bool got_abbreviation = false;
-        char abbrev[16];
-        char next_abbrev[16];
-        char const *b = reinterpret_cast<char const *>(getter.data);    // borrow to make this readable
-        int token_count = jsmn_parse(&p, b, getter.length, tokens, json_token_max);
-        for(int i = 1; i < token_count; ++i) {
-            jsmntok_t const &key = tokens[i];
-            jsmntok_t const &val = tokens[i + 1];
-            if(key.eq("status", b)) {
-                success = val.eq("OK", b);
-                ESP_LOGI(TAG, "TimezoneDB success");
-                i += 1;
-            } else if(key.eq("abbreviation", b)) {
-                val.get_str(abbrev, b);
-                ESP_LOGI(TAG, "ABBREV %s", abbrev);
-                got_abbreviation = true;
-                i += 1;
-            } else if(key.eq("nextAbbreviation", b)) {
-                val.get_str(next_abbrev, b);
-                ESP_LOGI(TAG, "NEXT ABBREV %s", next_abbrev);
-                i += 1;
-            } else if(key.eq("gmtOffset", b)) {
-                val.get_int(gmt_offset, b);
-                ESP_LOGI(TAG, "GMT offset %d", gmt_offset);
-                got_offset = true;
-                i += 1;
-            }
-        }
-        if(got_offset && got_abbreviation) {
-            char tz_buffer[20];
-            int minutes = gmt_offset / 60;
-            int hours = minutes / 60;
-            minutes %= 60;
-            sprintf(tz_buffer, "<%.5s>%-.2d:%02d", abbrev, -hours, -minutes);
-            setenv("TZ", tz_buffer, 1);
-            tzset();
-            ESP_LOGV(TAG, "TZ=%s", tz_buffer);
-        } else {
-            ESP_LOGW(TAG, "HUH? TZ not got");
-        }
-    }
-    (void)success;
-}
-
-//////////////////////////////////////////////////////////////////////
-// get the ip address, latitude and longitude of this esp12
-// note geolocation can be wrong!
-// user should have an option to correct it with the buttons
-
-static esp_err_t get_location()
-{
-    ip_json *api = ip_apis[which_api];
-    which_api = 1 - which_api;
-    http_get getter;
-    getter.init(512);
-    esp_http_client_config_t config;
-    memset(&config, 0, sizeof(config));
-    config.url = api->url;    //"http://ip-api.com/json?fields=lat,lon,query";
-    config.event_handler = _http_event_handler;
-    config.user_data = &getter;
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-
-    defer(esp_http_client_cleanup(client));
-
-    esp_err_t err = esp_http_client_perform(client);
-    if(err != ESP_OK) {
-        return err;
-    }
-    int status_code = esp_http_client_get_status_code(client);
-    int content_length = esp_http_client_get_content_length(client);
-    ESP_LOGI(TAG, "HTTP GET Status = %d, content_length = %d", status_code, content_length);
-    ESP_LOGI(TAG, "CONTENT: %.*s", getter.length, getter.data);
-
-    if(status_code >= 400) {
-        ESP_LOGE(TAG, "HTTP GET request failed: %d", err);
-        return ESP_ERR_NOT_FOUND;
-    }
-
-    jsmn_parser p;
-
-    bool got_ip_address = false;
-    int got_lat_lon = 0;
-    char ip_addr[16];
-
-    float ip_lat = 0;    // what we got from ip-api
-    float ip_lon = 0;
-
-    jsmn_init(&p);
-    char const *b = reinterpret_cast<char const *>(getter.data);
-    int token_count = jsmn_parse(&p, b, getter.length, tokens, json_token_max);
-    if(token_count == 0 || tokens[0].type != JSMN_OBJECT) {
-        return ESP_ERR_NOT_FOUND;
-    }
-
-    for(int i = 1; i < token_count; i += 2) {
-        jsmntok_t const &key = tokens[i];
-        jsmntok_t const &val = tokens[i + 1];
-        ESP_LOGV(TAG, "KEY: %.*s, VAL: %.*s", key.len(), b + key.start, val.len(), b + val.start);
-        switch(api->get_key_id(b + key.start, key.len())) {
-        case key_ip:
-            got_ip_address = true;
-            val.get_str(ip_addr, b);
-            break;
-        case key_lat:
-            val.get_flt(ip_lat, b);
-            got_lat_lon |= 1;
-            break;
-        case key_lon:
-            val.get_flt(ip_lon, b);
-            got_lat_lon |= 2;
-            break;
-        default:
-            ESP_LOGE(TAG, "Unknown key: %.*s", val.len(), b + val.start);
-            break;
-        }
-    }
-
-    if(got_lat_lon != 3 || !got_ip_address) {
-        ESP_LOGE(TAG, "Error getting geo location: %02x", got_lat_lon);
-        return ESP_ERR_NOT_FOUND;
-    }
-    ESP_LOGI(TAG, "IP: %s, Lat: %f, Lon: %f", ip_addr, ip_lat, ip_lon);
-    clock_update_timezone(ip_lat, ip_lon);
-    return ESP_OK;
-}
-
-//////////////////////////////////////////////////////////////////////
-
-bool is_sntp_working()
-{
-    time_t now;
-    struct tm timeinfo;
-    time(&now);
-    localtime_r(&now, &timeinfo);
-    return timeinfo.tm_year >= (2020 - 1900);    // bogus, but it's the recommended way
-}
-
-//////////////////////////////////////////////////////////////////////
-// calculate a crc for an stm32 message
-
-uint16 crc16(byte const *p, size_t len)
-{
-    assert(len != 0);
-    uint16 crc = 0xffff;
-    byte const *e = p + len;
-    do {
-        uint16 x = (crc >> 8) ^ *p;
-        x ^= x >> 4;
-        crc = (crc << 8) ^ (x << 12) ^ (x << 5) ^ x;
-    } while(++p < e);
-    return crc;
-}
-
-// and with copy to somewhere else
-
-uint16 crc16_copy(byte const *p, byte *dst, size_t len)
-{
-    assert(len != 0);
-    uint16 crc = 0xffff;
-    byte const *e = p + len;
-    do {
-        byte c = *p;
-        uint16 x = (crc >> 8) ^ c;
-        x ^= x >> 4;
-        crc = (crc << 8) ^ (x << 12) ^ (x << 5) ^ x;
-        *dst++ = c;
-    } while(++p < e);
-    return crc;
-}
-
-//////////////////////////////////////////////////////////////////////
-
-EventGroupHandle_t message_events;
 
 control_message_t control_message;
 clock_message_t clock_message;
 
-//////////////////////////////////////////////////////////////////////
+messenger control_messenger;
+messenger clock_messenger;
 
-int button_state;
-int button_press;
-int button_release;
+//////////////////////////////////////////////////////////////////////
 
 void button_update()
 {
@@ -465,77 +107,17 @@ void button_task(void *)
             // whole big menu handler here
             ESP_LOGV(TAG, "press: %d, release: %d, buttons = %d", button_press, button_release, button_state);
 
-            xEventGroupSync(message_events, send_control, control_sent, portMAX_DELAY);
+            control_messenger.send(control_message);
         }
         vTaskDelay(1);    // delay for 10ms
     }
 }
 
 //////////////////////////////////////////////////////////////////////
-
-void start_sntp()
-{
-    static char const *TAG = "SNTP";
-
-    ESP_LOGI(TAG, "Init SNTP");
-    sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    sntp_setservername(0, const_cast<char *>("pool.ntp.org"));
-    wifi_wait_until(wifi_event_connected, portMAX_DELAY);
-    sntp_init();
-}
-
-//////////////////////////////////////////////////////////////////////
-// for marshalling messages to the stm32
-
-template <typename T> struct messenger
-{
-    byte const *msg;
-    int len;
-    int signature;
-    uint32 send_req;
-    uint32 sent_ack;
-
-    messenger(T const &m)
-    {
-        msg = (byte const *)&m;
-        len = sizeof(T);
-        signature = T::signature;
-        send_req = T::send_bits;
-        sent_ack = T::sent_bits;
-        if(!std::is_base_of<message_base_t, T>::value) {
-            ESP_LOGE(TAG, "messenger is only for message_base_t derived classes");
-            esp_restart();
-        }
-        if(len > largest_message_size) {
-            ESP_LOGE(TAG, "messenger is angry about the length %d (max is %d)", len, largest_message_size);
-            esp_restart();
-        }
-    }
-
-    void update(uint32 got_bits)
-    {
-        if(got_bits & send_req) {
-            byte buf[largest_message_size + 4];
-            buf[0] = signature;
-            buf[1] = len;
-            uint16 crc = crc16_copy(msg, buf + 2, len);
-            buf[len + 2] = crc & 0xff;
-            buf[len + 3] = crc >> 8;
-            uart_write_bytes(UART_NUM_1, (char const *)buf, len + 4);
-            ESP_LOGV(TAG, "SENT: %d (%02x%02x ... %02x%02x)", len, buf[0], buf[1], buf[len + 2], buf[len + 3]);
-            xEventGroupSetBits(message_events, sent_ack);
-        }
-    }
-};
-
-messenger<control_message_t> control_messenger(control_message);
-messenger<clock_message_t> clock_messenger(clock_message);
-
-//////////////////////////////////////////////////////////////////////
 // this waits for signals from client tasks requesting that
 // messages get sent to the stm32
 
-void message_task(void *)
+void IRAM_ATTR message_task(void *)
 {
     // setup uart1 for sending stm32 messages
     uart_config_t uart_config = { .baud_rate = 115200,
@@ -547,12 +129,10 @@ void message_task(void *)
     uart_param_config(UART_NUM_1, &uart_config);
     uart_driver_install(UART_NUM_1, STM32_MSG_BUF_SIZE * 2, 0, 0, NULL, 0);
 
+
     // sit there and send messages as requested
     while(true) {
-        uint32 requests = xEventGroupWaitBits(message_events, send_control | send_clock, pdTRUE, pdFALSE, portMAX_DELAY);
-
-        control_messenger.update(requests);
-        clock_messenger.update(requests);
+        messenger::update();
     }
 }
 
@@ -560,10 +140,12 @@ void message_task(void *)
 
 void do_clock()
 {
-    // this event group is used to request and notify that
-    // messages are sent to the stm32 over the uart
-    // two bits per message so up to 16 types of message, just 2 used for now (control, clock)
-    message_events = xEventGroupCreate();
+    ESP_LOGI(TAG, "Clock task begins");
+
+    messenger::init();
+
+    control_messenger.init_message(control_message);
+    clock_messenger.init_message(clock_message);
 
     // this task does the actual sending
     xTaskCreate(message_task, "message_sender", 2048, null, 20, null);
@@ -574,66 +156,30 @@ void do_clock()
     // then this current task becomes the clock task which sends clock_message_t messages
     initialise_wifi();
 
-    clock_state = clock_state_idle;
-    ESP_LOGI(TAG, "Clock task begins");
     wifi_wait_until(wifi_event_connected, portMAX_DELAY);
 
-    clock_state = clock_state_initializing;
     ESP_LOGI(TAG, "Wifi connected, getting time and timezone");
 
-    // init sntp
-    start_sntp();
-
-    if(get_location() != ESP_OK) {
+    if(init_timezone() != ESP_OK) {
         ESP_LOGE(TAG, "Can't get IP/Location/Timezone");
     }
 
     ESP_LOGI(TAG, "Clock init complete");
-    clock_state = clock_state_ready;
 
-    bool sntp_log = true;
-    int sntp_patience = 30;
+    start_sntp();
+
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
-    constexpr uint32 one_second = 1;
-    constexpr uint32 one_minute = one_second * 60;
-    constexpr uint32 one_hour = one_minute * 60;
-    constexpr uint32 one_day = one_hour * 24;
-
     while(true) {
-        if(is_sntp_working()) {
 
-            struct timespec t;
-            clock_gettime(CLOCK_REALTIME, &t);
-            uint32 daytime = ((t.tv_sec - 1) + clock_timezone_offset()) % one_day;    // -1, not sure why it's off
-            clock_message.hours = daytime / one_hour;
-            clock_message.minutes = (daytime % one_hour) / 60;
-            clock_message.seconds = daytime % 60;
-            clock_message.milliseconds = t.tv_nsec / 1000000;
-            xEventGroupSync(message_events, send_clock, clock_sent, portMAX_DELAY);
-
-            if(sntp_log) {
-                ESP_LOGI(TAG, "Got SNTP connection, clock is running");
-                sntp_log = false;
-            }
-
-            vTaskDelayUntil(&xLastWakeTime, 1000 / portTICK_PERIOD_MS);
-        } else {
-            ESP_LOGI(TAG, "Waiting for SNTP");
-            sntp_patience -= 1;
-            if(sntp_patience == 0) {
-
-                // if SNTP doesn't start after about a minute then
-                // we've probably been connected to a duff server
-                // so reboot the SNTP client and hope for a different one
-                ESP_LOGI(TAG, "SNTP patience exhausted, restarting it");
-                sntp_stop();
-                sntp_init();
-                sntp_patience = 60;
-                sntp_log = true;
-            }
-            // wait until some time before next second so next one arrives on the second
-            vTaskDelayUntil(&xLastWakeTime, 1000 / portTICK_PERIOD_MS);
-        }
+        struct timespec t;
+        clock_gettime(CLOCK_REALTIME, &t);
+        uint32 daytime = (t.tv_sec + timezone_offset()) % one_day;
+        clock_message.hours = daytime / one_hour;
+        clock_message.minutes = (daytime % one_hour) / 60;
+        clock_message.seconds = daytime % 60;
+        clock_message.milliseconds = t.tv_nsec / 1000000;
+        clock_messenger.send(clock_message);
+        vTaskDelayUntil(&xLastWakeTime, 1000 / portTICK_PERIOD_MS);
     }
 }

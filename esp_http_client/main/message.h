@@ -11,6 +11,8 @@ enum colon_flash_mode : int
     pulse = 3
 };
 
+//////////////////////////////////////////////////////////////////////
+
 enum hours_mode : int
 {
     hours_24 = 0,
@@ -19,27 +21,15 @@ enum hours_mode : int
 
 //////////////////////////////////////////////////////////////////////
 
-enum event_bits : uint32
-{
-    send_control = 1,    // please send the control message
-    control_sent = 2,    // I sent it
-    send_clock = 4,      // please send the clock message
-    clock_sent = 8       // I sent it
-};
-
-//////////////////////////////////////////////////////////////////////
-
-// first 3 bytes are signature (16 bits) len (8 bits)
-// then message
-// then crc (16 bits)
-
-
 #define clock_message_signature 0xDC
 #define control_message_signature 0xDD
 
 struct message_base_t
 {
-};
+    byte sig;       // see #defines above
+    byte length;    // sizeof derived type
+    uint16 crc;     // crc of just the derived part
+} __attribute__((packed));
 
 //////////////////////////////////////////////////////////////////////
 // clock_message_t - what to display as time.
@@ -51,9 +41,7 @@ struct clock_message_t : message_base_t
     // messenger admin
     enum
     {
-        signature = clock_message_signature,
-        send_bits = send_clock,
-        sent_bits = clock_sent
+        signature = clock_message_signature
     };
 
     uint32 hours : 5;
@@ -61,7 +49,7 @@ struct clock_message_t : message_base_t
     uint32 seconds : 6;
     uint32 milliseconds : 10;
     uint32 pad : 5;
-};
+} __attribute__((packed));
 
 //////////////////////////////////////////////////////////////////////
 // control_message_t - control display options
@@ -72,9 +60,7 @@ struct control_message_t : message_base_t
 {
     enum
     {
-        signature = control_message_signature,
-        send_bits = send_control,
-        sent_bits = control_sent
+        signature = control_message_signature
     };
 
     uint16 brightness : 6;          // 64 levels of brightness
@@ -87,6 +73,6 @@ struct control_message_t : message_base_t
     uint16 show_hour_ticks : 1;    // turn hour ticks on or off
     uint16 test_display : 1;       // switch on all the leds at full brightness
     uint16 pad : 12;
-};
+} __attribute__((packed));
 
 size_t constexpr largest_message_size = sizeof(largest_type<clock_message_t, control_message_t>::type);

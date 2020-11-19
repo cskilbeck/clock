@@ -47,6 +47,12 @@ typedef struct
 #endif
 
 #if defined(__cplusplus)
+
+    char const *ptr(char const *json) const
+    {
+        return json + start;
+    }
+
     int len() const
     {
         return end - start;
