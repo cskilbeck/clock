@@ -658,7 +658,7 @@ template <typename T> void process_message(T const &m)
 template <> void process_message<control_message_t>(control_message_t const &m)
 {
     user_brightness = m.brightness & 63;
-    number_to_display = m.brightness;
+    number_to_display = m.brightness - 13;
     set_display_handler(display_number);
 }
 

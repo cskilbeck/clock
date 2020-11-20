@@ -66,7 +66,7 @@ void menu_task(void *)
             send_it = true;
         }
         if(btn_pressed(b, 1)) {
-            control_message.brightness = max(1, control_message.brightness - 1);
+            control_message.brightness = max(14, control_message.brightness - 1);
             send_it = true;
         }
 
