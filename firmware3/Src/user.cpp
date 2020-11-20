@@ -49,8 +49,8 @@ uint8 const minutes_map[60] = {
     77, 75, 74, 73, 72
 };
 
-// to divide a 6 bit number by 10
-byte div10[64] =
+// to divide a 2 digit number by 10
+byte div10[100] =
 {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -58,7 +58,10 @@ byte div10[64] =
     3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
     4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
     5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-    5, 5, 5, 5
+    6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+    9, 9, 9, 9, 9, 9, 9, 9, 9, 9
 };
 // clang-format on
 
@@ -541,7 +544,30 @@ uint32 minutes;
 uint32 seconds;
 uint32 millis;
 
-void set_digits()
+int sec_ticks;
+
+////////////////////////////////////////////////////////////////////////////////
+// show a 2 digit number
+
+void set_number(int d, int x)
+{
+    if(x > 99) {
+        x = 0;
+    }
+    uint32 h0 = div10[x];
+    uint32 h1 = x - (h0 * 10);
+    memset(clock_digits, 0, 7);
+    clock_digits[d + 0] = h0 + '0';
+    clock_digits[d + 1] = h1 + '0';
+    for(int i = 0; i < 7; ++i) {
+        set_ascii(i, clock_digits[i]);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// show the time
+
+void display_clock()
 {
     uint32 h0 = div10[hours];
     uint32 h1 = hours - (h0 * 10);
@@ -556,28 +582,6 @@ void set_digits()
     clock_digits[3] = m1 + '0';
     clock_digits[4] = s0 + '0';
     clock_digits[5] = s1 + '0';
-}
-
-void display_clock()
-{
-    int sec_ticks = second_ticks() + millis1024;
-    while(sec_ticks > 1023) {
-        last_second_ticks += 1024;
-        sec_ticks -= 1024;
-        seconds += 1;
-        if(seconds >= 60) {
-            seconds = 0;
-            minutes += 1;
-            if(minutes >= 60) {
-                minutes = 0;
-                hours += 1;
-                if(hours >= 24) {
-                    hours = 0;
-                }
-            }
-        }
-    }
-    set_digits();
 
     for(int i = 0; i < 7; ++i) {
         set_ascii(i, clock_digits[i]);
@@ -633,6 +637,18 @@ void display_test()
 
 ////////////////////////////////////////////////////////////////////////////////
 
+int number_to_display = 0;
+
+void display_number()
+{
+    set_number(4, number_to_display);
+    if(handler_time() > 1023) {
+        set_display_handler(display_clock);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 template <typename T> void process_message(T const &m)
 {
 }
@@ -641,7 +657,9 @@ template <typename T> void process_message(T const &m)
 
 template <> void process_message<control_message_t>(control_message_t const &m)
 {
-    set_display_handler(display_test);
+    user_brightness = m.brightness & 63;
+    number_to_display = m.brightness;
+    set_display_handler(display_number);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -674,7 +692,7 @@ template <> void process_message<clock_message_t>(clock_message_t const &m)
 
 template <typename T> void handle_message()
 {
-    process_message<T>(*reinterpret_cast<T const *>(ss_buffer));
+    process_message<T>(*reinterpret_cast<T const *>(ss_buffer + sizeof(message_header_t)));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -692,6 +710,22 @@ void update_clock()
         }
         msg_type_received = 0;
     }
+
+    sec_ticks = second_ticks() + millis1024;
+    while(sec_ticks > 1023) {
+        last_second_ticks += 1024;
+        sec_ticks -= 1024;
+        if(++seconds >= 60) {
+            seconds = 0;
+            if(++minutes >= 60) {
+                minutes = 0;
+                if(++hours >= 24) {
+                    hours = 0;
+                }
+            }
+        }
+    }
+
     (current_display_handler)();
 }
 

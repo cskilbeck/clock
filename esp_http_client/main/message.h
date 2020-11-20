@@ -24,19 +24,20 @@ enum hours_mode : int
 #define clock_message_signature 0xDC
 #define control_message_signature 0xDD
 
-struct message_base_t
+//////////////////////////////////////////////////////////////////////
+// it sends this before the message
+
+struct message_header_t
 {
     byte sig;       // see #defines above
     byte length;    // sizeof derived type
-    uint16 crc;     // crc of just the derived part
+    uint16 crc;     // crc of the message
 } __attribute__((packed));
 
 //////////////////////////////////////////////////////////////////////
 // clock_message_t - what to display as time.
-// guaranteed to arrive 1 second apart so the stm32 can use this
-// to synchronize effects which happen between seconds (fading etc)
 
-struct clock_message_t : message_base_t
+struct clock_message_t
 {
     // messenger admin
     enum
@@ -52,11 +53,9 @@ struct clock_message_t : message_base_t
 } __attribute__((packed));
 
 //////////////////////////////////////////////////////////////////////
-// control_message_t - control display options
-// Not synchronized with anything, might disrupt the clock timing
-// temporarily, but not by much
+// control_message_t - any other stuff
 
-struct control_message_t : message_base_t
+struct control_message_t
 {
     enum
     {
@@ -74,5 +73,7 @@ struct control_message_t : message_base_t
     uint16 test_display : 1;       // switch on all the leds at full brightness
     uint16 pad : 12;
 } __attribute__((packed));
+
+//////////////////////////////////////////////////////////////////////
 
 size_t constexpr largest_message_size = sizeof(largest_type<clock_message_t, control_message_t>::type);
