@@ -114,6 +114,14 @@ volatile uint32 ticks = 0;
 // this was the mibiseconds last time we got a clock message
 uint32 millis1024;
 
+char clock_digits[7];
+uint32 hours;
+uint32 minutes;
+uint32 seconds;
+uint32 millis;
+
+int sec_ticks;
+
 ////////////////////////////////////////////////////////////////////////////////
 // set one bit of config data in a spi buffer
 
@@ -174,6 +182,54 @@ void set_hex(int start_digit, int value, int num_digits, uint16 b = 1023)
 void set_decimal_point(int digit, uint16 b)
 {
     brightness[digit_base[digit] + digit_map[0]] = b;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void clear_digits()
+{
+    memset(clock_digits, 0, 7);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void print(int d, char const *msg)
+{
+    while(d < 7 && *msg) {
+        clock_digits[d++] = *msg++;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// show a 2 digit number
+
+void set_number(int d, int x)
+{
+    if(x > 99) {
+        x = 99;
+    }
+    uint32 h0 = div10[x];
+    uint32 h1 = x - (h0 * 10);
+    clock_digits[d + 0] = h0 + '0';
+    clock_digits[d + 1] = h1 + '0';
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void clear_second_ticks()
+{
+    for(int i=0; i<60; ++i) {
+        brightness[minutes_map[i]] = 0;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void clear_hour_ticks()
+{
+    for(int i=0; i<60; ++i) {
+        brightness[hours_map[i]] = 0;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -537,34 +593,6 @@ void display_fade()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-
-char clock_digits[7];
-uint32 hours;
-uint32 minutes;
-uint32 seconds;
-uint32 millis;
-
-int sec_ticks;
-
-////////////////////////////////////////////////////////////////////////////////
-// show a 2 digit number
-
-void set_number(int d, int x)
-{
-    if(x > 99) {
-        x = 0;
-    }
-    uint32 h0 = div10[x];
-    uint32 h1 = x - (h0 * 10);
-    memset(clock_digits, 0, 7);
-    clock_digits[d + 0] = h0 + '0';
-    clock_digits[d + 1] = h1 + '0';
-    for(int i = 0; i < 7; ++i) {
-        set_ascii(i, clock_digits[i]);
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // show the time
 
 void display_clock()
@@ -637,11 +665,8 @@ void display_test()
 
 ////////////////////////////////////////////////////////////////////////////////
 
-int number_to_display = 0;
-
-void display_number()
+void display_pause()
 {
-    set_number(4, number_to_display);
     if(handler_time() > 1023) {
         set_display_handler(display_clock);
     }
@@ -649,50 +674,48 @@ void display_number()
 
 ////////////////////////////////////////////////////////////////////////////////
 
-template <typename T> void process_message(T const &m)
-{
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-template <> void process_message<control_message_t>(control_message_t const &m)
+void process_message(control_message_t const &m)
 {
     user_brightness = m.brightness & 63;
-    number_to_display = m.brightness - 13;
-    set_display_handler(display_number);
+
+    clear_second_ticks();
+    clear_hour_ticks();
+    clear_digits();
+    
+    print(0, "brt");
+    set_number(4, m.brightness - 13);
+
+    for(int i = 0; i < 7; ++i) {
+        set_ascii(i, clock_digits[i]);
+    }
+
+    set_display_handler(display_pause);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-template <> void process_message<clock_message_t>(clock_message_t const &m)
+void process_message(clock_message_t const &m)
 {
-    // we got a clock message
-    // format the digits
-    // and note the millis
-
-    // this time is actually a bit late due to the 115200 serial
-    // time and some overhead for irqs etc so we should add on
-    // some amount before sending it from the esp12
-
     hours = m.hours;
     minutes = m.minutes;
     seconds = m.seconds;
     millis = m.milliseconds;
 
     // this was milliseconds in 0..1023 format
-    millis1024 = (millis * 67109) >> 16;    // scale from 0..999 to 0..1023 (kinda)
+    // so scale from 0..999 to 0..1023 (kinda mostly)
+    millis1024 = (millis * 67109) >> 16;
 
     // this was when the message was received
     last_second_ticks = ticks;
 
-    // later, we use the difference between (ticks - last_second_ticks) + millis1024 to get a new absolute time
+    // (ticks - last_second_ticks) + millis1024 = new absolute time
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 template <typename T> void handle_message()
 {
-    process_message<T>(*reinterpret_cast<T const *>(ss_buffer + sizeof(message_header_t)));
+    process_message(*reinterpret_cast<T const *>(ss_buffer + sizeof(message_header_t)));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -700,10 +723,13 @@ template <typename T> void handle_message()
 void update_clock()
 {
     if(msg_type_received != 0) {
+
         switch(msg_type_received) {
+
         case control_message_signature:
             handle_message<control_message_t>();
             break;
+
         case clock_message_signature:
             handle_message<clock_message_t>();
             break;
