@@ -83,10 +83,10 @@ static void IRAM_ATTR button_task(void *)
         uint32 gpio = GPIO.in;
 
         bool changed = false;
-        changed |= b[0].update(1 - ((gpio & BTN1_MASK) >> BTN1_POS));
-        changed |= b[1].update(1 - ((gpio & BTN2_MASK) >> BTN2_POS));
+        changed |= b[0].update(1 - ((gpio >> BTN1_POS) & 1));
+        changed |= b[1].update(1 - ((gpio >> BTN2_POS) & 1));
 
-        if(changed != 0) {
+        if(changed) {
             uint32 button_bits = (b[0].state << 4) | b[1].state;
             xQueueSend(button_queue, &button_bits, portMAX_DELAY);
         }

@@ -53,7 +53,7 @@ struct messenger
     }
 
     // lazy - use template rather than parameters for signature, length
-    template <typename T> void init_message(T const &m)
+    template <typename T> void init(T const &m)
     {
         init_messenger(reinterpret_cast<byte const *>(&m), T::signature, sizeof(T));
     }

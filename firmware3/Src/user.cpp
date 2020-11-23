@@ -614,6 +614,7 @@ void display_clock()
     for(int i = 0; i < 7; ++i) {
         set_ascii(i, clock_digits[i]);
     }
+
     for(int i = 0; i < seconds; ++i) {
         brightness[minutes_map[i]] = 256;
     }
@@ -779,17 +780,17 @@ void update_ambient()
 
     int const ambient_update_speed = 4;
     // high pass filter the ambient_light
-    ambient_light = ((ambient_light * 31) >> 5) + adc;
-    ambient_target = ((ambient_light * 100) >> 5) + 8192;
-    if(ambient_target > 65535) {
-        ambient_target = 65535;
+    ambient_light = ((ambient_light * 511) >> 9) + adc;
+
+    ambient_target = ambient_light >> 5;
+    
+    int clamped = util::min(util::max(ambient_light, 16384), 65536);
+    
+    if(ambient_scale < clamped) {
+        ambient_scale = util::min(ambient_scale + ambient_update_speed, clamped);
     }
-    int scaled_ambient = (ambient_target * user_brightness) >> 6;
-    if(ambient_scale < scaled_ambient) {
-        ambient_scale = util::min(ambient_scale + ambient_update_speed, scaled_ambient);
-    }
-    if(ambient_scale > scaled_ambient) {
-        ambient_scale = util::max(ambient_scale - ambient_update_speed, scaled_ambient);
+    if(ambient_scale > clamped) {
+        ambient_scale = util::max(ambient_scale - ambient_update_speed, clamped);
     }
     set_global_brightness((ambient_scale * user_brightness) >> (9 + 6));
 

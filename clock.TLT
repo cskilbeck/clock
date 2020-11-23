@@ -1,4 +1,5 @@
 ToolsLayout
+  HandledServerView='Altium.Edp.ComponentSearch.Plugin'
   HandledServerView='Messages'
   HandledServerView='Workspace'
   FormLayout
@@ -8,9 +9,12 @@ ToolsLayout
     FormIsOpen=True
     FormIsActive=True
     FormHandledKind='Engagement'
+    FormHandledKind='OUTPUTJOB'
     FormHandledKind='PCB'
+    FormHandledKind='PCBLIB'
     FormHandledKind='PICKATASK'
     FormHandledKind='SCH'
+    FormHandledKind='SCHLIB'
   End
   BarLayout
     BarName='TLLayerStackToolbar'
@@ -55,8 +59,7 @@ ToolsLayout
     BarDocumentKind=BOM
   End
   BarLayout
-    BarName='TBAssemblyVariants'
-    BarDockRow=1
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=BOM
   End
@@ -66,7 +69,8 @@ ToolsLayout
     BarDocumentKind=BOM
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBAssemblyVariants'
+    BarDockRow=1
     BarAlign=Right
     BarDocumentKind=BOM
   End
@@ -119,12 +123,13 @@ ToolsLayout
     BarDocumentKind=CAMtastic
   End
   BarLayout
-    BarName='TLFabToolbar'
-    BarDockRow=2
+    BarName='TBNavigation'
     BarAlign=Right
-    BarFloatLeft=323
-    BarFloatTop=283
-    BarFloatWidth=253
+    BarDocumentKind=CAMtastic
+  End
+  BarLayout
+    BarName='TBLayout'
+    BarAlign=Right
     BarDocumentKind=CAMtastic
   End
   BarLayout
@@ -137,13 +142,12 @@ ToolsLayout
     BarDocumentKind=CAMtastic
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TLFabToolbar'
+    BarDockRow=2
     BarAlign=Right
-    BarDocumentKind=CAMtastic
-  End
-  BarLayout
-    BarName='TBNavigation'
-    BarAlign=Right
+    BarFloatLeft=323
+    BarFloatTop=283
+    BarFloatWidth=253
     BarDocumentKind=CAMtastic
   End
   BarLayout
@@ -165,12 +169,12 @@ ToolsLayout
     BarDocumentKind=CKT
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=CKT
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=CKT
   End
@@ -184,12 +188,12 @@ ToolsLayout
     BarDocumentKind=CmpLib
   End
   BarLayout
-    BarName='TBAssemblyVariants'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=CmpLib
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBAssemblyVariants'
     BarAlign=Right
     BarDocumentKind=CmpLib
   End
@@ -203,12 +207,12 @@ ToolsLayout
     BarDocumentKind=CMPT
   End
   BarLayout
-    BarName='TBAssemblyVariants'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=CMPT
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBAssemblyVariants'
     BarAlign=Right
     BarDocumentKind=CMPT
   End
@@ -231,12 +235,12 @@ ToolsLayout
     BarDocumentKind=Constraint
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=Constraint
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=Constraint
   End
@@ -250,12 +254,12 @@ ToolsLayout
     BarDocumentKind=CoreProject
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=CoreProject
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=CoreProject
   End
@@ -283,12 +287,12 @@ ToolsLayout
     BarDocumentKind=CUPL
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=CUPL
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=CUPL
   End
@@ -306,12 +310,12 @@ ToolsLayout
     BarDocumentKind=DatabaseLib
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=DatabaseLib
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=DatabaseLib
   End
@@ -329,12 +333,12 @@ ToolsLayout
     BarDocumentKind=DatabaseLink
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=DatabaseLink
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=DatabaseLink
   End
@@ -346,7 +350,7 @@ ToolsLayout
     BarDocumentKind=DefaultEditor
   End
   BarLayout
-    BarName='HKNoDocument'
+    BarName='MNNoDocument'
     BarAlign=Right
     BarWasLoaded=True
     BarDocumentKind=DefaultEditor
@@ -359,7 +363,7 @@ ToolsLayout
     BarDocumentKind=DefaultEditor
   End
   BarLayout
-    BarName='MNNoDocument'
+    BarName='HKNoDocument'
     BarAlign=Right
     BarWasLoaded=True
     BarDocumentKind=DefaultEditor
@@ -383,12 +387,12 @@ ToolsLayout
     BarDocumentKind=EDIF
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=EDIF
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=EDIF
   End
@@ -411,16 +415,16 @@ ToolsLayout
     BarDocumentKind=EDIFLIB
   End
   BarLayout
+    BarName='TBNavigation'
+    BarAlign=Right
+    BarDocumentKind=EDIFLIB
+  End
+  BarLayout
     BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=EDIFLIB
   End
   BarLayout
-    BarName='TBNavigation'
-    BarAlign=Right
-    BarDocumentKind=EDIFLIB
-  End
-  BarLayout
     BarName='MNEditScriptMainMenuDebug'
     BarDocumentKind=EditScriptBas
   End
@@ -444,12 +448,12 @@ ToolsLayout
     BarDocumentKind=EditScriptBas
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=EditScriptBas
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=EditScriptBas
   End
@@ -477,12 +481,12 @@ ToolsLayout
     BarDocumentKind=EditScriptDS
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=EditScriptDS
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=EditScriptDS
   End
@@ -510,12 +514,12 @@ ToolsLayout
     BarDocumentKind=EditScriptInstrument
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=EditScriptInstrument
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=EditScriptInstrument
   End
@@ -543,12 +547,12 @@ ToolsLayout
     BarDocumentKind=EditScriptJS
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=EditScriptJS
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=EditScriptJS
   End
@@ -576,12 +580,12 @@ ToolsLayout
     BarDocumentKind=EditScriptTcl
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=EditScriptTcl
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=EditScriptTcl
   End
@@ -609,12 +613,12 @@ ToolsLayout
     BarDocumentKind=EditScriptVBS
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=EditScriptVBS
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=EditScriptVBS
   End
@@ -628,12 +632,12 @@ ToolsLayout
     BarDocumentKind=EmbeddedProject
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=EmbeddedProject
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=EmbeddedProject
   End
@@ -662,12 +666,12 @@ ToolsLayout
     BarDocumentKind=FpgaFlow
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=FpgaFlow
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=FpgaFlow
   End
@@ -681,12 +685,12 @@ ToolsLayout
     BarDocumentKind=FPGAProject
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=FPGAProject
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=FPGAProject
   End
@@ -710,12 +714,12 @@ ToolsLayout
     BarDocumentKind=FPGAWorkspace
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=FPGAWorkspace
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=FPGAWorkspace
   End
@@ -733,12 +737,12 @@ ToolsLayout
     BarDocumentKind=FPGTRG
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=FPGTRG
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=FPGTRG
   End
@@ -766,13 +770,7 @@ ToolsLayout
     BarDocumentKind=FSM
   End
   BarLayout
-    BarName='TLFormatting'
-    BarDockRow=1
-    BarAlign=Right
-    BarDocumentKind=FSM
-  End
-  BarLayout
-    BarName='TBLayout'
+    BarName='TLFSMUtilities'
     BarAlign=Right
     BarDocumentKind=FSM
   End
@@ -782,7 +780,13 @@ ToolsLayout
     BarDocumentKind=FSM
   End
   BarLayout
-    BarName='TLFSMUtilities'
+    BarName='TBLayout'
+    BarAlign=Right
+    BarDocumentKind=FSM
+  End
+  BarLayout
+    BarName='TLFormatting'
+    BarDockRow=1
     BarAlign=Right
     BarDocumentKind=FSM
   End
@@ -844,12 +848,12 @@ ToolsLayout
     BarDocumentKind=IntegratedLibrary
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=IntegratedLibrary
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=IntegratedLibrary
   End
@@ -863,7 +867,7 @@ ToolsLayout
     BarDocumentKind=LibraryMigrator
   End
   BarLayout
-    BarName='TBAssemblyVariants'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=LibraryMigrator
   End
@@ -873,7 +877,7 @@ ToolsLayout
     BarDocumentKind=LibraryMigrator
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBAssemblyVariants'
     BarAlign=Right
     BarDocumentKind=LibraryMigrator
   End
@@ -896,12 +900,12 @@ ToolsLayout
     BarDocumentKind=LogicAnalyser
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=LogicAnalyser
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=LogicAnalyser
   End
@@ -924,12 +928,12 @@ ToolsLayout
     BarDocumentKind=LogicAnalyserAnalog
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=LogicAnalyserAnalog
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=LogicAnalyserAnalog
   End
@@ -952,12 +956,12 @@ ToolsLayout
     BarDocumentKind=MDL
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=MDL
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=MDL
   End
@@ -1101,12 +1105,12 @@ ToolsLayout
     BarDocumentKind=MultiBoardAssembly
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=MultiBoardAssembly
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=MultiBoardAssembly
   End
@@ -1129,12 +1133,12 @@ ToolsLayout
     BarDocumentKind=NSX
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=NSX
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=NSX
   End
@@ -1172,27 +1176,6 @@ ToolsLayout
     BarDocumentKind=OpenBus
   End
   BarLayout
-    BarName='TLFormatting'
-    BarDockRow=1
-    BarAlign=Right
-    BarDocumentKind=OpenBus
-  End
-  BarLayout
-    BarName='TBLayout'
-    BarAlign=Right
-    BarDocumentKind=OpenBus
-  End
-  BarLayout
-    BarName='TBNavigation'
-    BarAlign=Right
-    BarDocumentKind=OpenBus
-  End
-  BarLayout
-    BarName='TLOpenBusUtilities'
-    BarAlign=Right
-    BarDocumentKind=OpenBus
-  End
-  BarLayout
     BarName='TLSchUtilities'
     BarAlign=Right
     BarFloatLeft=330
@@ -1201,25 +1184,52 @@ ToolsLayout
     BarDocumentKind=OpenBus
   End
   BarLayout
+    BarName='TLOpenBusUtilities'
+    BarAlign=Right
+    BarDocumentKind=OpenBus
+  End
+  BarLayout
+    BarName='TBNavigation'
+    BarAlign=Right
+    BarDocumentKind=OpenBus
+  End
+  BarLayout
+    BarName='TBLayout'
+    BarAlign=Right
+    BarDocumentKind=OpenBus
+  End
+  BarLayout
+    BarName='TLFormatting'
+    BarDockRow=1
+    BarAlign=Right
+    BarDocumentKind=OpenBus
+  End
+  BarLayout
     BarName='HTJobManager'
+    BarWasLoaded=True
     BarDocumentKind=OutputJob
   End
   BarLayout
     BarName='MNJobManager'
+    BarWasLoaded=True
     BarDocumentKind=OutputJob
   End
   BarLayout
     BarName='TBJobManager'
     BarDockRow=1
-    BarDocumentKind=OutputJob
-  End
-  BarLayout
-    BarName='TBLayout'
-    BarAlign=Right
+    BarActive=False
+    BarWasLoaded=True
     BarDocumentKind=OutputJob
   End
   BarLayout
     BarName='TBNavigation'
+    BarAlign=Right
+    BarActive=False
+    BarWasLoaded=True
+    BarDocumentKind=OutputJob
+  End
+  BarLayout
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=OutputJob
   End
@@ -1358,33 +1368,58 @@ ToolsLayout
     BarDocumentKind=PCB
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TLPlacementTools_PCAD'
+    BarDockRow=2
     BarAlign=Right
+    BarFloatLeft=507
+    BarFloatTop=442
+    BarFloatWidth=373
     BarDocumentKind=PCB
   End
   BarLayout
-    BarName='TBLayout_PCAD'
+    BarName='TLPlacementTools'
+    BarDockRow=2
     BarAlign=Right
+    BarFloatLeft=507
+    BarFloatTop=442
+    BarFloatWidth=373
     BarDocumentKind=PCB
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TLComponentPlacement_PCAD'
+    BarDockRow=2
     BarAlign=Right
-    BarActive=False
+    BarFloatLeft=312
+    BarFloatTop=165
+    BarFloatWidth=138
+    BarDocumentKind=PCB
+  End
+  BarLayout
+    BarName='TLComponentPlacement'
+    BarDockRow=2
+    BarAlign=Right
+    BarFloatLeft=312
+    BarFloatTop=165
+    BarFloatWidth=138
+    BarDocumentKind=PCB
+  End
+  BarLayout
+    BarName='TopBarPCB'
+    BarDockRow=1
+    BarAlign=Right
     BarWasLoaded=True
     BarDocumentKind=PCB
   End
   BarLayout
-    BarName='TBNavigation_PCAD'
+    BarName='TLFilter_PCAD'
+    BarDockRow=1
     BarAlign=Right
     BarDocumentKind=PCB
   End
   BarLayout
-    BarName='TLPCBUtilities'
+    BarName='TLFilter'
+    BarDockRow=1
     BarAlign=Right
-    BarFloatLeft=330
-    BarFloatTop=160
-    BarFloatWidth=216
     BarActive=False
     BarWasLoaded=True
     BarDocumentKind=PCB
@@ -1398,60 +1433,35 @@ ToolsLayout
     BarDocumentKind=PCB
   End
   BarLayout
-    BarName='TLFilter'
-    BarDockRow=1
+    BarName='TLPCBUtilities'
+    BarAlign=Right
+    BarFloatLeft=330
+    BarFloatTop=160
+    BarFloatWidth=216
+    BarActive=False
+    BarWasLoaded=True
+    BarDocumentKind=PCB
+  End
+  BarLayout
+    BarName='TBNavigation_PCAD'
+    BarAlign=Right
+    BarDocumentKind=PCB
+  End
+  BarLayout
+    BarName='TBNavigation'
     BarAlign=Right
     BarActive=False
     BarWasLoaded=True
     BarDocumentKind=PCB
   End
   BarLayout
-    BarName='TLFilter_PCAD'
-    BarDockRow=1
+    BarName='TBLayout_PCAD'
     BarAlign=Right
     BarDocumentKind=PCB
   End
   BarLayout
-    BarName='TopBarPCB'
-    BarDockRow=1
+    BarName='TBLayout'
     BarAlign=Right
-    BarWasLoaded=True
-    BarDocumentKind=PCB
-  End
-  BarLayout
-    BarName='TLComponentPlacement'
-    BarDockRow=2
-    BarAlign=Right
-    BarFloatLeft=312
-    BarFloatTop=165
-    BarFloatWidth=138
-    BarDocumentKind=PCB
-  End
-  BarLayout
-    BarName='TLComponentPlacement_PCAD'
-    BarDockRow=2
-    BarAlign=Right
-    BarFloatLeft=312
-    BarFloatTop=165
-    BarFloatWidth=138
-    BarDocumentKind=PCB
-  End
-  BarLayout
-    BarName='TLPlacementTools'
-    BarDockRow=2
-    BarAlign=Right
-    BarFloatLeft=507
-    BarFloatTop=442
-    BarFloatWidth=373
-    BarDocumentKind=PCB
-  End
-  BarLayout
-    BarName='TLPlacementTools_PCAD'
-    BarDockRow=2
-    BarAlign=Right
-    BarFloatLeft=507
-    BarFloatTop=442
-    BarFloatWidth=373
     BarDocumentKind=PCB
   End
   BarLayout
@@ -1468,12 +1478,12 @@ ToolsLayout
     BarDocumentKind=PCB3D
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=PCB3D
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=PCB3D
   End
@@ -1491,12 +1501,12 @@ ToolsLayout
     BarDocumentKind=PCB3DLIB
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=PCB3DLIB
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=PCB3DLIB
   End
@@ -1530,6 +1540,7 @@ ToolsLayout
   End
   BarLayout
     BarName='HTPCBLibHotKeys'
+    BarWasLoaded=True
     BarDocumentKind=PCBLib
   End
   BarLayout
@@ -1546,6 +1557,7 @@ ToolsLayout
   End
   BarLayout
     BarName='MNPCBLibMenu'
+    BarWasLoaded=True
     BarDocumentKind=PCBLib
   End
   BarLayout
@@ -1555,6 +1567,8 @@ ToolsLayout
   BarLayout
     BarName='TLPCBLibToolbar'
     BarDockRow=1
+    BarActive=False
+    BarWasLoaded=True
     BarDocumentKind=PCBLib
   End
   BarLayout
@@ -1565,6 +1579,8 @@ ToolsLayout
   BarLayout
     BarName='TLPCBLibPlacementTools'
     BarDockRow=1
+    BarActive=False
+    BarWasLoaded=True
     BarDocumentKind=PCBLib
   End
   BarLayout
@@ -1573,8 +1589,25 @@ ToolsLayout
     BarDocumentKind=PCBLib
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='MNPCBLibPopup'
+    BarWasLoaded=True
+    BarDocumentKind=PCBLib
+  End
+  BarLayout
+    BarName='TopBarPcbLib'
+    BarWasLoaded=True
+    BarDocumentKind=PCBLib
+  End
+  BarLayout
+    BarName='TBNavigation_PCAD'
     BarAlign=Right
+    BarDocumentKind=PCBLib
+  End
+  BarLayout
+    BarName='TBNavigation'
+    BarAlign=Right
+    BarActive=False
+    BarWasLoaded=True
     BarDocumentKind=PCBLib
   End
   BarLayout
@@ -1583,12 +1616,7 @@ ToolsLayout
     BarDocumentKind=PCBLib
   End
   BarLayout
-    BarName='TBNavigation'
-    BarAlign=Right
-    BarDocumentKind=PCBLib
-  End
-  BarLayout
-    BarName='TBNavigation_PCAD'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=PCBLib
   End
@@ -1607,12 +1635,12 @@ ToolsLayout
     BarDocumentKind=PcbProject
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=PcbProject
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=PcbProject
   End
@@ -1652,15 +1680,15 @@ ToolsLayout
     BarDocumentKind=PickATask
   End
   BarLayout
-    BarName='TBLayout'
-    BarAlign=Right
-    BarDocumentKind=PickATask
-  End
-  BarLayout
     BarName='TBNavigation'
     BarAlign=Right
     BarActive=False
     BarWasLoaded=True
+    BarDocumentKind=PickATask
+  End
+  BarLayout
+    BarName='TBLayout'
+    BarAlign=Right
     BarDocumentKind=PickATask
   End
   BarLayout
@@ -1713,12 +1741,12 @@ ToolsLayout
     BarDocumentKind=ProtelNetlist
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=ProtelNetlist
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=ProtelNetlist
   End
@@ -1770,11 +1798,6 @@ ToolsLayout
     BarDocumentKind=Sch
   End
   BarLayout
-    BarName='HTSchematicHotKeys'
-    BarWasLoaded=True
-    BarDocumentKind=Sch
-  End
-  BarLayout
     BarName='TLPowerObjects'
     BarState=BarStateFloating
     BarDockSite=DockSiteNone
@@ -1793,7 +1816,7 @@ ToolsLayout
     BarDocumentKind=Sch
   End
   BarLayout
-    BarName='TLSimulationSources'
+    BarName='TLSimulationSources_PCAD'
     BarState=BarStateFloating
     BarDockSite=DockSiteNone
     BarFloatLeft=304
@@ -1813,7 +1836,7 @@ ToolsLayout
     BarDocumentKind=Sch
   End
   BarLayout
-    BarName='TLSimulationSources_PCAD'
+    BarName='TLSimulationSources'
     BarState=BarStateFloating
     BarDockSite=DockSiteNone
     BarFloatLeft=304
@@ -1841,11 +1864,11 @@ ToolsLayout
     BarDocumentKind=Sch
   End
   BarLayout
-    BarName='TLSchematicTools'
+    BarName='TLWiringTools'
     BarDockRow=1
-    BarFloatLeft=387
-    BarFloatTop=265
-    BarFloatWidth=669
+    BarFloatLeft=416
+    BarFloatTop=369
+    BarFloatWidth=304
     BarActive=False
     BarWasLoaded=True
     BarDocumentKind=Sch
@@ -1859,11 +1882,11 @@ ToolsLayout
     BarDocumentKind=Sch
   End
   BarLayout
-    BarName='TLWiringTools'
+    BarName='TLSchematicTools'
     BarDockRow=1
-    BarFloatLeft=416
-    BarFloatTop=369
-    BarFloatWidth=304
+    BarFloatLeft=387
+    BarFloatTop=265
+    BarFloatWidth=669
     BarActive=False
     BarWasLoaded=True
     BarDocumentKind=Sch
@@ -1874,13 +1897,101 @@ ToolsLayout
     BarDocumentKind=Sch
   End
   BarLayout
-    BarName='MNSchematicPopup'
+    BarName='TLUnderlineToolbar'
+    BarState=BarStateFloating
+    BarDockSite=DockSiteNone
+    BarAlign=Right
+    BarFloatLeft=304
+    BarFloatTop=359
+    BarFloatWidth=180
+    BarDocumentKind=Sch
+  End
+  BarLayout
+    BarName='TLDigitalObjects'
+    BarState=BarStateFloating
+    BarDockSite=DockSiteNone
+    BarAlign=Right
+    BarFloatLeft=304
+    BarFloatTop=359
+    BarFloatWidth=115
+    BarActive=False
+    BarDocumentKind=Sch
+  End
+  BarLayout
+    BarName='TLSchUtilities_PCAD'
+    BarAlign=Right
+    BarFloatLeft=330
+    BarFloatTop=160
+    BarFloatWidth=216
+    BarDocumentKind=Sch
+  End
+  BarLayout
+    BarName='TLSchUtilities'
+    BarAlign=Right
+    BarFloatLeft=330
+    BarFloatTop=160
+    BarFloatWidth=216
+    BarActive=False
     BarWasLoaded=True
     BarDocumentKind=Sch
   End
   BarLayout
-    BarName='TopBarSchematic'
+    BarName='TBNavigation_PCAD'
+    BarAlign=Right
+    BarDocumentKind=Sch
+  End
+  BarLayout
+    BarName='TBNavigation'
+    BarAlign=Right
+    BarActive=False
     BarWasLoaded=True
+    BarDocumentKind=Sch
+  End
+  BarLayout
+    BarName='TBLayout'
+    BarAlign=Right
+    BarDocumentKind=Sch
+  End
+  BarLayout
+    BarName='TBLayout_PCAD'
+    BarAlign=Right
+    BarDocumentKind=Sch
+  End
+  BarLayout
+    BarName='TLFormatting'
+    BarDockRow=1
+    BarAlign=Right
+    BarActive=False
+    BarWasLoaded=True
+    BarDocumentKind=Sch
+  End
+  BarLayout
+    BarName='TLFormatting_PCAD'
+    BarDockRow=1
+    BarAlign=Right
+    BarDocumentKind=Sch
+  End
+  BarLayout
+    BarName='HTSchematicHotKeys'
+    BarDockRow=2
+    BarAlign=Right
+    BarWasLoaded=True
+    BarDocumentKind=Sch
+  End
+  BarLayout
+    BarName='MNSchematicPopup'
+    BarDockRow=2
+    BarAlign=Right
+    BarWasLoaded=True
+    BarDocumentKind=Sch
+  End
+  BarLayout
+    BarName='TLDrawingTools'
+    BarDockRow=2
+    BarAlign=Right
+    BarFloatLeft=441
+    BarFloatTop=472
+    BarFloatWidth=281
     BarDocumentKind=Sch
   End
   BarLayout
@@ -1896,100 +2007,27 @@ ToolsLayout
     BarDocumentKind=Sch
   End
   BarLayout
-    BarName='TLDrawingTools'
+    BarName='TopBarSchematic'
     BarDockRow=2
     BarAlign=Right
-    BarFloatLeft=441
-    BarFloatTop=472
-    BarFloatWidth=281
-    BarDocumentKind=Sch
-  End
-  BarLayout
-    BarName='TLFormatting_PCAD'
-    BarDockRow=1
-    BarAlign=Right
-    BarDocumentKind=Sch
-  End
-  BarLayout
-    BarName='TLFormatting'
-    BarDockRow=1
-    BarAlign=Right
-    BarActive=False
     BarWasLoaded=True
-    BarDocumentKind=Sch
-  End
-  BarLayout
-    BarName='TBLayout_PCAD'
-    BarAlign=Right
-    BarDocumentKind=Sch
-  End
-  BarLayout
-    BarName='TBLayout'
-    BarAlign=Right
-    BarDocumentKind=Sch
-  End
-  BarLayout
-    BarName='TBNavigation'
-    BarAlign=Right
-    BarActive=False
-    BarWasLoaded=True
-    BarDocumentKind=Sch
-  End
-  BarLayout
-    BarName='TBNavigation_PCAD'
-    BarAlign=Right
-    BarDocumentKind=Sch
-  End
-  BarLayout
-    BarName='TLSchUtilities'
-    BarAlign=Right
-    BarFloatLeft=330
-    BarFloatTop=160
-    BarFloatWidth=216
-    BarActive=False
-    BarWasLoaded=True
-    BarDocumentKind=Sch
-  End
-  BarLayout
-    BarName='TLSchUtilities_PCAD'
-    BarAlign=Right
-    BarFloatLeft=330
-    BarFloatTop=160
-    BarFloatWidth=216
-    BarDocumentKind=Sch
-  End
-  BarLayout
-    BarName='TLDigitalObjects'
-    BarState=BarStateFloating
-    BarDockSite=DockSiteNone
-    BarAlign=Right
-    BarFloatLeft=304
-    BarFloatTop=359
-    BarFloatWidth=115
-    BarActive=False
-    BarDocumentKind=Sch
-  End
-  BarLayout
-    BarName='TLUnderlineToolbar'
-    BarState=BarStateFloating
-    BarDockSite=DockSiteNone
-    BarAlign=Right
-    BarFloatLeft=304
-    BarFloatTop=359
-    BarFloatWidth=180
     BarDocumentKind=Sch
   End
   BarLayout
     BarName='MNSchLibMenu'
+    BarWasLoaded=True
     BarDocumentKind=SchLib
   End
   BarLayout
     BarName='HTSchLibHotKeys'
+    BarWasLoaded=True
     BarDocumentKind=SchLib
   End
   BarLayout
     BarName='TLSchLibTools'
     BarDockRow=1
+    BarActive=False
+    BarWasLoaded=True
     BarDocumentKind=SchLib
   End
   BarLayout
@@ -2016,6 +2054,8 @@ ToolsLayout
   BarLayout
     BarName='TLModeToolbar'
     BarDockRow=1
+    BarActive=False
+    BarWasLoaded=True
     BarDocumentKind=SchLib
   End
   BarLayout
@@ -2032,16 +2072,34 @@ ToolsLayout
     BarFloatLeft=330
     BarFloatTop=160
     BarFloatWidth=72
+    BarActive=False
+    BarWasLoaded=True
     BarDocumentKind=SchLib
   End
   BarLayout
-    BarName='TLSchLibDrawingTools'
-    BarDockRow=2
+    BarName='MNSchematicLibPopup'
+    BarWasLoaded=True
+    BarDocumentKind=SchLib
+  End
+  BarLayout
+    BarName='TopBarSchLib'
+    BarWasLoaded=True
+    BarDocumentKind=SchLib
+  End
+  BarLayout
+    BarName='HTSchLibInteractiveHotKeys'
+    BarWasLoaded=True
+    BarDocumentKind=SchLib
+  End
+  BarLayout
+    BarName='TBNavigation'
     BarAlign=Right
+    BarActive=False
+    BarWasLoaded=True
     BarDocumentKind=SchLib
   End
   BarLayout
-    BarName='TBLayout_PCAD'
+    BarName='TBNavigation_PCAD'
     BarAlign=Right
     BarDocumentKind=SchLib
   End
@@ -2051,12 +2109,13 @@ ToolsLayout
     BarDocumentKind=SchLib
   End
   BarLayout
-    BarName='TBNavigation_PCAD'
+    BarName='TBLayout_PCAD'
     BarAlign=Right
     BarDocumentKind=SchLib
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TLSchLibDrawingTools'
+    BarDockRow=2
     BarAlign=Right
     BarDocumentKind=SchLib
   End
@@ -2070,12 +2129,12 @@ ToolsLayout
     BarDocumentKind=ScriptProject
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=ScriptProject
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=ScriptProject
   End
@@ -2089,12 +2148,12 @@ ToolsLayout
     BarDocumentKind=SeaOfDocuments
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=SeaOfDocuments
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=SeaOfDocuments
   End
@@ -2117,12 +2176,12 @@ ToolsLayout
     BarDocumentKind=SimData
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=SimData
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=SimData
   End
@@ -2262,13 +2321,7 @@ ToolsLayout
     BarDocumentKind=SystemLevelDiagram
   End
   BarLayout
-    BarName='TLFormatting'
-    BarDockRow=1
-    BarAlign=Right
-    BarDocumentKind=SystemLevelDiagram
-  End
-  BarLayout
-    BarName='TBLayout'
+    BarName='TLDiagramUtilities'
     BarAlign=Right
     BarDocumentKind=SystemLevelDiagram
   End
@@ -2278,7 +2331,13 @@ ToolsLayout
     BarDocumentKind=SystemLevelDiagram
   End
   BarLayout
-    BarName='TLDiagramUtilities'
+    BarName='TBLayout'
+    BarAlign=Right
+    BarDocumentKind=SystemLevelDiagram
+  End
+  BarLayout
+    BarName='TLFormatting'
+    BarDockRow=1
     BarAlign=Right
     BarDocumentKind=SystemLevelDiagram
   End
@@ -2314,12 +2373,12 @@ ToolsLayout
     BarDocumentKind=Text
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=Text
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=Text
   End
@@ -2347,12 +2406,12 @@ ToolsLayout
     BarDocumentKind=Verilog
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=Verilog
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=Verilog
   End
@@ -2380,12 +2439,12 @@ ToolsLayout
     BarDocumentKind=VERLIB
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=VERLIB
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=VERLIB
   End
@@ -2413,12 +2472,12 @@ ToolsLayout
     BarDocumentKind=VERTST
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=VERTST
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=VERTST
   End
@@ -2446,12 +2505,12 @@ ToolsLayout
     BarDocumentKind=VHDL
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=VHDL
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=VHDL
   End
@@ -2479,12 +2538,12 @@ ToolsLayout
     BarDocumentKind=VHDLIB
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=VHDLIB
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=VHDLIB
   End
@@ -2513,12 +2572,12 @@ ToolsLayout
     BarDocumentKind=VHDMDL
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=VHDMDL
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=VHDMDL
   End
@@ -2546,12 +2605,12 @@ ToolsLayout
     BarDocumentKind=VHDTST
   End
   BarLayout
-    BarName='TBlayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=VHDTST
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBlayout'
     BarAlign=Right
     BarDocumentKind=VHDTST
   End
@@ -2574,12 +2633,12 @@ ToolsLayout
     BarDocumentKind=Wave
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=Wave
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=Wave
   End
@@ -2607,12 +2666,12 @@ ToolsLayout
     BarDocumentKind=WaveSim
   End
   BarLayout
-    BarName='TBLayout'
+    BarName='TBNavigation'
     BarAlign=Right
     BarDocumentKind=WaveSim
   End
   BarLayout
-    BarName='TBNavigation'
+    BarName='TBLayout'
     BarAlign=Right
     BarDocumentKind=WaveSim
   End
@@ -2620,7 +2679,7 @@ ToolsLayout
     FrameState=FrameStateFloating
     FrameDockSite=DockSiteNone
     FrameDockedWidth=280
-    FrameFloatRect='29.17, 10.00, 46.67, 80.83'
+    FrameFloatRect='29.17, 4.26, 46.67, 80.83'
     SectionLayout
       PanelLayout
         PanelName='NewDocuments'
@@ -2638,29 +2697,9 @@ ToolsLayout
         PanelFloatHeight=850
       End
       PanelLayout
-        PanelName='PCBLibPanel'
-        PanelFloatWidth=280
-        PanelFloatHeight=850
-      End
-      PanelLayout
-        PanelName='PCBLibFilter'
-        PanelFloatWidth=770
-        PanelFloatHeight=206
-      End
-      PanelLayout
         PanelName='PLDSearchPanel'
         PanelFloatWidth=280
         PanelFloatHeight=850
-      End
-      PanelLayout
-        PanelName='SchLibraryPanel'
-        PanelFloatWidth=280
-        PanelFloatHeight=850
-      End
-      PanelLayout
-        PanelName='LibFilter'
-        PanelFloatWidth=640
-        PanelFloatHeight=206
       End
       PanelLayout
         PanelName='DiagramFilter'
@@ -2745,10 +2784,13 @@ ToolsLayout
       ActivePanels
         'EditReport' 'ReportCodeExplorer'
         'PCB3D' 'PCB3DPanel'
-        'Engagement' 'PCBNavigator'
         'PICKATASK' 'Workspace'
-        'DefaultEditor' 'PCBNavigator'
+        'SCHLIB' ''
+        'DefaultEditor' ''
         '' ''
+        'PCB' ''
+        'PCBLIB' ''
+        'SCH' ''
       End
     End
   End
@@ -2756,7 +2798,7 @@ ToolsLayout
     FrameState=FrameStateFloating
     FrameDockSite=DockSiteNone
     FrameDockedWidth=280
-    FrameFloatRect='29.17, 10.00, 46.67, 80.83'
+    FrameFloatRect='47.40, 0.00, 68.70, 99.26'
     SectionLayout
       PanelLayout
         PanelName='Favorites'
@@ -2782,9 +2824,8 @@ ToolsLayout
       End
       PanelLayout
         PanelName='Altium.Edp.ComponentSearch.Plugin'
-        PanelVisible=False
-        PanelFloatWidth=280
-        PanelFloatHeight=850
+        PanelFloatWidth=409
+        PanelFloatHeight=1072
       End
       PanelLayout
         PanelName='Altium.Edp.PartSearch.Plugin'
@@ -2813,14 +2854,11 @@ ToolsLayout
         PanelFloatHeight=850
       End
       ActivePanels
-        'DefaultEditor' 'Altium.Edp.ComponentSearch.Plugin'
         'PickATask' 'Altium.Edp.ComponentSearch.Plugin'
-        'OutputJob' 'Altium.Edp.ComponentSearch.Plugin'
         'DatabaseLink' 'Altium.Edp.ComponentSearch.Plugin'
         'FPGAWorkspace' 'Favorites'
         'PCBLIB' 'Altium.Edp.ComponentSearch.Plugin'
         'CUPL' 'Altium.Edp.ComponentSearch.Plugin'
-        'SCH' 'Altium.Edp.ComponentSearch.Plugin'
         'SCHLIB' 'Altium.Edp.ComponentSearch.Plugin'
         'CAMTastic' 'Altium.Edp.ComponentSearch.Plugin'
         'Constraint' 'Favorites'
@@ -2845,8 +2883,10 @@ ToolsLayout
         'ProtelNetlist' 'Altium.Edp.ComponentSearch.Plugin'
         'WAVE' 'Altium.Edp.ComponentSearch.Plugin'
         'WAVESIM' 'Altium.Edp.ComponentSearch.Plugin'
-        'Engagement' 'Altium.Edp.ComponentSearch.Plugin'
-        '' ''
+        'PCB' 'Altium.Edp.ComponentSearch.Plugin'
+        'SCH' 'Altium.Edp.ComponentSearch.Plugin'
+        'DefaultEditor' 'Altium.Edp.ComponentSearch.Plugin'
+        '' 'Altium.Edp.ComponentSearch.Plugin'
       End
     End
   End
@@ -2872,6 +2912,11 @@ ToolsLayout
           'WAVE' 'SimulationSignals'
           'WAVESIM' 'SimulationSignals'
           '' ''
+          'PCB' ''
+          'SCHLIB' ''
+          'PCBLIB' ''
+          'SCH' ''
+          'DefaultEditor' ''
         End
       End
       SectionLayout
@@ -2913,7 +2958,7 @@ ToolsLayout
     FrameState=FrameStateFloating
     FrameDockSite=DockSiteNone
     FrameDockedWidth=850
-    FrameFloatRect='17.86, 34.26, 60.99, 75.93'
+    FrameFloatRect='3.44, 0.00, 48.13, 98.98'
     SectionLayout
       PanelLayout
         PanelName='StorageExplorer'
@@ -2923,9 +2968,8 @@ ToolsLayout
       End
       PanelLayout
         PanelName='Messages'
-        PanelVisible=False
-        PanelFloatWidth=828
-        PanelFloatHeight=450
+        PanelFloatWidth=858
+        PanelFloatHeight=1069
       End
       PanelLayout
         PanelName='Output'
@@ -2940,8 +2984,12 @@ ToolsLayout
         PanelFloatHeight=256
       End
       ActivePanels
-        'DefaultEditor' 'StorageExplorer'
-        '' ''
+        'DefaultEditor' 'Messages'
+        'PCB' 'Messages'
+        'SCH' 'Messages'
+        '' 'Messages'
+        'SCHLIB' 'Messages'
+        'PCBLIB' 'Messages'
       End
     End
   End
@@ -2971,6 +3019,11 @@ ToolsLayout
       End
       ActivePanels
         '' ''
+        'PCB' ''
+        'SCHLIB' ''
+        'PCBLIB' ''
+        'SCH' ''
+        'DefaultEditor' ''
       End
     End
   End
@@ -3001,6 +3054,11 @@ ToolsLayout
       ActivePanels
         'FPGAWorkspace' 'NanoboardDevicePanel'
         '' ''
+        'PCB' ''
+        'SCHLIB' ''
+        'PCBLIB' ''
+        'SCH' ''
+        'DefaultEditor' ''
       End
     End
   End
@@ -3018,6 +3076,11 @@ ToolsLayout
       End
       ActivePanels
         '' ''
+        'PCB' ''
+        'SCHLIB' ''
+        'PCBLIB' ''
+        'SCH' ''
+        'DefaultEditor' ''
       End
     End
   End
@@ -3083,6 +3146,11 @@ ToolsLayout
       End
       ActivePanels
         '' ''
+        'PCB' ''
+        'SCHLIB' ''
+        'PCBLIB' ''
+        'SCH' ''
+        'DefaultEditor' ''
       End
     End
   End
@@ -3113,6 +3181,11 @@ ToolsLayout
       ActivePanels
         'EditScriptDS' 'EditScriptBreakPoints'
         '' ''
+        'PCB' ''
+        'SCHLIB' ''
+        'PCBLIB' ''
+        'SCH' ''
+        'DefaultEditor' ''
       End
     End
   End
@@ -3137,6 +3210,11 @@ ToolsLayout
       ActivePanels
         'EditScriptDS' 'EditScriptBreakPoints'
         '' ''
+        'PCB' ''
+        'SCHLIB' ''
+        'PCBLIB' ''
+        'SCH' ''
+        'DefaultEditor' ''
       End
     End
   End
@@ -3156,6 +3234,11 @@ ToolsLayout
         'EditScript' 'SnippetsView'
         'VHDMDL' 'SnippetsView'
         '' ''
+        'PCB' ''
+        'SCHLIB' ''
+        'PCBLIB' ''
+        'SCH' ''
+        'DefaultEditor' ''
       End
     End
   End
@@ -3173,6 +3256,11 @@ ToolsLayout
       End
       ActivePanels
         '' ''
+        'PCB' ''
+        'SCHLIB' ''
+        'PCBLIB' ''
+        'SCH' ''
+        'DefaultEditor' ''
       End
     End
   End
@@ -3180,10 +3268,17 @@ ToolsLayout
     FrameState=FrameStateFloating
     FrameDockSite=DockSiteNone
     FrameDockedWidth=280
-    FrameFloatRect='67.45, 0.00, 100.00, 100.46'
+    FrameFloatRect='67.97, 0.00, 100.42, 99.17'
     SectionLayout
       PanelLayout
         PanelName='Workspace'
+        PanelFloatWidth=623
+        PanelFloatHeight=1071
+      End
+      PanelLayout
+        PanelName='PCBLibPanel'
+        PanelFloatWidth=280
+        PanelFloatHeight=850
       End
       PanelLayout
         PanelName='PCBInteractivePropertiesPanelView'
@@ -3196,6 +3291,11 @@ ToolsLayout
         PanelFloatHeight=600
       End
       PanelLayout
+        PanelName='SchLibraryPanel'
+        PanelFloatWidth=280
+        PanelFloatHeight=850
+      End
+      PanelLayout
         PanelName='SCHInteractivePropertiesPanelView'
         PanelFloatWidth=280
         PanelFloatHeight=850
@@ -3206,6 +3306,16 @@ ToolsLayout
         PanelFloatWidth=280
         PanelFloatHeight=850
       End
+      PanelLayout
+        PanelName='LibFilter'
+        PanelFloatWidth=640
+        PanelFloatHeight=206
+      End
+      PanelLayout
+        PanelName='PCBLibFilter'
+        PanelFloatWidth=770
+        PanelFloatHeight=206
+      End
       ActivePanels
         'EditReport' 'ReportCodeExplorer'
         'PCB3D' 'PCB3DPanel'
@@ -3215,6 +3325,9 @@ ToolsLayout
         'PICKATASK' 'Workspace'
         'PCB' 'PCBInteractivePropertiesPanelView'
         'SCH' 'SCHInteractivePropertiesPanelView'
+        'OUTPUTJOB' 'Workspace'
+        'SCHLIB' 'Workspace'
+        'PCBLIB' 'PCBInteractivePropertiesPanelView'
       End
     End
   End
@@ -3232,6 +3345,11 @@ ToolsLayout
       End
       ActivePanels
         '' ''
+        'PCB' ''
+        'SCHLIB' ''
+        'PCBLIB' ''
+        'SCH' ''
+        'DefaultEditor' ''
       End
     End
   End
@@ -3249,6 +3367,11 @@ ToolsLayout
       End
       ActivePanels
         '' ''
+        'PCB' ''
+        'SCHLIB' ''
+        'PCBLIB' ''
+        'SCH' ''
+        'DefaultEditor' ''
       End
     End
   End
@@ -3266,6 +3389,11 @@ ToolsLayout
       End
       ActivePanels
         '' ''
+        'PCB' ''
+        'SCHLIB' ''
+        'PCBLIB' ''
+        'SCH' ''
+        'DefaultEditor' ''
       End
     End
   End
@@ -3284,10 +3412,13 @@ ToolsLayout
       ActivePanels
         'EditReport' 'ReportCodeExplorer'
         'PCB3D' 'PCB3DPanel'
-        'Engagement' 'PCBNavigator'
         'PICKATASK' 'Workspace'
-        'DefaultEditor' 'PCBNavigator'
         '' ''
+        'PCB' ''
+        'SCHLIB' ''
+        'PCBLIB' ''
+        'SCH' ''
+        'DefaultEditor' ''
       End
     End
   End
@@ -3301,6 +3432,11 @@ ToolsLayout
         'EditReport' 'ReportCodeExplorer'
         'PCB3D' 'PCB3DPanel'
         '' ''
+        'PCB' ''
+        'SCHLIB' ''
+        'PCBLIB' ''
+        'SCH' ''
+        'DefaultEditor' ''
       End
     End
   End
@@ -3311,16 +3447,16 @@ ToolsLayout
     FrameFloatRect='29.17, 10.00, 46.67, 80.83'
     SectionLayout
       ActivePanels
-        'DefaultEditor' 'Altium.Edp.ComponentSearch.Plugin'
+        'DefaultEditor' ''
         'PickATask' 'Altium.Edp.ComponentSearch.Plugin'
         'OutputJob' 'Altium.Edp.ComponentSearch.Plugin'
         'DatabaseLink' 'Altium.Edp.ComponentSearch.Plugin'
         'FPGAWorkspace' 'Favorites'
-        'PCB' 'Altium.Edp.ComponentSearch.Plugin'
-        'PCBLIB' 'Altium.Edp.ComponentSearch.Plugin'
+        'PCB' ''
+        'PCBLIB' ''
         'CUPL' 'Altium.Edp.ComponentSearch.Plugin'
-        'SCH' 'Altium.Edp.ComponentSearch.Plugin'
-        'SCHLIB' 'Altium.Edp.ComponentSearch.Plugin'
+        'SCH' ''
+        'SCHLIB' ''
         'CAMTastic' 'Altium.Edp.ComponentSearch.Plugin'
         'Constraint' 'Favorites'
         'EDIF' 'Altium.Edp.ComponentSearch.Plugin'
@@ -3351,12 +3487,32 @@ ToolsLayout
   FrameLayout
     FrameState=FrameStateFloating
     FrameDockSite=DockSiteNone
+    FrameDockedWidth=850
+    FrameFloatRect='17.86, 34.26, 60.99, 75.93'
+    SectionLayout
+      ActivePanels
+        'DefaultEditor' ''
+        '' ''
+        'PCB' ''
+        'SCHLIB' ''
+        'PCBLIB' ''
+        'SCH' ''
+      End
+    End
+  End
+  FrameLayout
+    FrameState=FrameStateFloating
+    FrameDockSite=DockSiteNone
     FrameDockedWidth=280
     FrameFloatRect='45.57, 11.76, 69.74, 46.30'
     SectionLayout
       ActivePanels
-        'SCH' 'MiniViewer'
+        'SCH' ''
         '' ''
+        'PCB' ''
+        'SCHLIB' ''
+        'PCBLIB' ''
+        'DefaultEditor' ''
       End
     End
   End

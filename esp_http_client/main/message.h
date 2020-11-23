@@ -32,7 +32,7 @@ struct message_header_t
     byte sig;       // see #defines above
     byte length;    // sizeof derived type
     uint16 crc;     // crc of the message
-} __attribute__((packed));
+};
 
 //////////////////////////////////////////////////////////////////////
 // clock_message_t - what to display as time.
@@ -50,7 +50,7 @@ struct clock_message_t
     uint32 seconds : 6;
     uint32 milliseconds : 10;
     uint32 pad : 5;
-} __attribute__((packed));
+};
 
 //////////////////////////////////////////////////////////////////////
 // control_message_t - any other stuff
@@ -72,7 +72,7 @@ struct control_message_t
     uint16 show_hour_ticks : 1;    // turn hour ticks on or off
     uint16 test_display : 1;       // switch on all the leds at full brightness
     uint16 pad : 12;
-} __attribute__((packed));
+};
 
 //////////////////////////////////////////////////////////////////////
 
