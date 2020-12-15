@@ -23,6 +23,7 @@ enum hours_mode : int
 
 #define clock_message_signature 0xDC
 #define control_message_signature 0xDD
+#define text_message_signature 0xCD
 
 //////////////////////////////////////////////////////////////////////
 // it sends this before the message
@@ -53,6 +54,22 @@ struct clock_message_t
 };
 
 //////////////////////////////////////////////////////////////////////
+
+struct text_message_t
+{
+    enum
+    {
+        signature = text_message_signature
+    };
+    
+    byte msg[7];    // ascii
+    uint8 seconds: 5;
+    uint8 show_ticks: 1;
+    uint8 show_colon: 1;
+    uint8 override_brightness: 1;
+};
+
+//////////////////////////////////////////////////////////////////////
 // control_message_t - any other stuff
 
 struct control_message_t
@@ -76,4 +93,10 @@ struct control_message_t
 
 //////////////////////////////////////////////////////////////////////
 
-size_t constexpr largest_message_size = sizeof(largest_type<clock_message_t, control_message_t>::type);
+// clang-format off
+size_t constexpr largest_message_size = sizeof(largest_type<
+    clock_message_t,
+    control_message_t,
+    text_message_t
+>::type);
+// clang-format on

@@ -20,10 +20,30 @@ static char const *TAG = "BUTTON";
 
 //////////////////////////////////////////////////////////////////////
 
-#define BTN1_POS GPIO_NUM_13
-#define BTN2_POS GPIO_NUM_14
+#define NUM_BUTTONS 3
+
+#define BTN1_POS GPIO_NUM_14
+#define BTN2_POS GPIO_NUM_13
+#define BTN3_POS GPIO_NUM_16
+
 #define BTN1_MASK (1 << BTN1_POS)
 #define BTN2_MASK (1 << BTN2_POS)
+#define BTN3_MASK (1 << BTN3_POS)
+
+struct btn_def
+{
+    gpio_num_t pos;
+    uint32_t mask;
+    gpio_pullup_t pullup;
+};
+
+// clang-format off
+btn_def const btn_defs[NUM_BUTTONS] = {
+    { BTN1_POS, BTN1_MASK, GPIO_PULLUP_ENABLE },
+    { BTN2_POS, BTN2_MASK, GPIO_PULLUP_ENABLE },
+    { BTN3_POS, BTN3_MASK, GPIO_PULLUP_DISABLE }
+};
+// clang-format on
 
 QueueHandle_t button_queue;
 
@@ -57,7 +77,7 @@ struct button
             auto_repeat += 1;
             if((auto_repeat > 0x40) && ((auto_repeat & 0x7) == 1)) {
                 state |= pressed | autorepeat;
-                change = true;
+                change = 1;
             }
         } else {
             auto_repeat = 0;
@@ -69,25 +89,32 @@ struct button
 };
 
 //////////////////////////////////////////////////////////////////////
+// turns out, if you're not too worried about latency/timing, polling
+// at 10ms intervals is a perfectly valid way to debounce even quite
+// crappy tactile switches
 
 static void IRAM_ATTR button_task(void *)
 {
     ESP_LOGI(TAG, "Button task begins");
 
-    int ar_start_loops = 100;    // 1 second autorepeat starts
-
-    button b[2];
+    button b[NUM_BUTTONS];
 
     while(true) {
 
         uint32 gpio = GPIO.in;
+        uint32 pin16 = READ_PERI_REG(RTC_GPIO_IN_DATA) & 1;
+        gpio = (gpio & 0xffff) | (pin16 << 16);
 
         bool changed = false;
-        changed |= b[0].update(1 - ((gpio >> BTN1_POS) & 1));
-        changed |= b[1].update(1 - ((gpio >> BTN2_POS) & 1));
+        for(int i = 0; i < NUM_BUTTONS; ++i) {
+            changed |= b[i].update(1 - ((gpio >> btn_defs[i].pos) & 1));
+        }
 
         if(changed) {
-            uint32 button_bits = (b[0].state << 4) | b[1].state;
+            uint32 button_bits = 0;
+            for(int i = 0; i < NUM_BUTTONS; ++i) {
+                button_bits = (button_bits << 4) | b[(NUM_BUTTONS - 1) - i].state;
+            }
             xQueueSend(button_queue, &button_bits, portMAX_DELAY);
         }
         vTaskDelay(pdMS_TO_TICKS(10));    // delay for 10ms
@@ -99,11 +126,14 @@ static void IRAM_ATTR button_task(void *)
 void button_init()
 {
     gpio_config_t io_conf;
-    io_conf.intr_type = GPIO_INTR_DISABLE;
-    io_conf.pin_bit_mask = BTN1_MASK | BTN2_MASK;
-    io_conf.mode = GPIO_MODE_INPUT;
-    io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
-    gpio_config(&io_conf);
+    for(int i = 0; i < 3; ++i) {
+        io_conf.intr_type = GPIO_INTR_DISABLE;
+        io_conf.pin_bit_mask = btn_defs[i].mask;
+        io_conf.mode = GPIO_MODE_INPUT;
+        io_conf.pull_up_en = btn_defs[i].pullup;
+        io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+        gpio_config(&io_conf);
+    }
 
     button_queue = xQueueCreate(10, sizeof(uint32));
 

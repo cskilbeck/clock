@@ -122,6 +122,8 @@ uint32 millis;
 
 int sec_ticks;
 
+text_message_t text_message;
+
 ////////////////////////////////////////////////////////////////////////////////
 // set one bit of config data in a spi buffer
 
@@ -422,6 +424,7 @@ void on_serial_byte(byte b)
         switch(b) {
         case control_message_signature:
         case clock_message_signature:
+        case text_message_signature:
             ss_state = ss_get_len;
             ss_msg_type = b;
             break;
@@ -451,7 +454,6 @@ void on_serial_byte(byte b)
         if(ss_len == ss_got) {
             if(ss_crc == crc_maybe) {
                 msg_type_received = ss_msg_type;
-                ss_reset();
             }
             ss_reset();
         }
@@ -525,6 +527,7 @@ void display_intro();
 void display_fade();
 void display_clock();
 void display_test();
+void display_text();
 
 display_handler current_display_handler = display_intro;
 uint32 display_handler_timestamp;    // ticks when display_handler was last changed
@@ -630,21 +633,27 @@ void display_clock()
     uint flash = 0;
 
     colon_flash_mode colon_mode = colon_flash_mode::solid;    // colon_flash_mode(last_msg.colon_flash_mode);
+
     switch(colon_mode) {
+
     case colon_flash_mode::off:
         flash = 0;
         break;
+
     case colon_flash_mode::pulse:
         flash = util::abs(((int)(sec_ticks + 573) & 1023) - 512);
         flash = util::min(1023u, flash << 3) >> 2;
         break;
+
     case colon_flash_mode::flash:
-        flash = ((sec_ticks >> 9) & 1) << 9;
+        flash = ((sec_ticks >> 9) & 1) << 8;
         break;
+
     case colon_flash_mode::solid:
-        flash = 512;
+        flash = 256;
         break;
     }
+
     brightness[colon_map[0]] = flash;
     brightness[colon_map[1]] = flash;
 }
@@ -660,6 +669,15 @@ void display_test()
         brightness[i] = 1023;
     }
     if(handler_time() > 1024) {
+        set_display_handler(display_clock);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void display_text()
+{
+    if(handler_time() > (text_message.seconds * 1024)) {
         set_display_handler(display_clock);
     }
 }
@@ -714,6 +732,17 @@ void process_message(clock_message_t const &m)
 
 ////////////////////////////////////////////////////////////////////////////////
 
+void process_message(text_message_t const &m)
+{
+    text_message = m;
+    for(int i = 0; i < 7; ++i) {
+        set_ascii(i, text_message.msg[i]);
+    }
+    set_display_handler(display_text);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 template <typename T> void handle_message()
 {
     process_message(*reinterpret_cast<T const *>(ss_buffer + sizeof(message_header_t)));
@@ -733,6 +762,10 @@ void update_clock()
 
         case clock_message_signature:
             handle_message<clock_message_t>();
+            break;
+        
+        case text_message_signature:
+            handle_message<text_message_t>();
             break;
         }
         msg_type_received = 0;

@@ -31,7 +31,7 @@
 
 //////////////////////////////////////////////////////////////////////
 
-#define clear_console "\x1b[2J\x1b[H Here we go..."
+#define clear_console "\x1b[2J\x1b[HHere we go..."
 
 static char const *TAG = "MAIN";
 
@@ -46,9 +46,11 @@ constexpr uint32 one_day = one_hour * 24;
 
 control_message_t control_message;
 clock_message_t clock_message;
+text_message_t text_message;
 
 messenger control_messenger;
 messenger clock_messenger;
+messenger text_messenger;
 
 //////////////////////////////////////////////////////////////////////
 
@@ -61,20 +63,47 @@ void menu_task(void *)
 
         // ESP_LOGI(TAG, "%08x", b);
 
-        bool send_it = false;
+        int presses = 0;
+        int held = 0;
+        int repeats = 0;
+        int releases = 0;
+        for(int i = 0; i < 3; ++i) {
+            if(btn_held(b, i)) {
+                held += 1;
+            }
+            if(btn_repeat(b, i)) {
+                repeats += 1;
+            }
+            if(btn_released(b, i)) {
+                releases += 1;
+            }
+        }
 
-        // button 0 is the top one
+        // button 0 is the middle one
+        // button 1 is the bottom one
+        // button 2 is the top one
 
         if(btn_pressed(b, 0)) {
             control_message.brightness = min(63, control_message.brightness + 1);
-            send_it = true;
+            presses += 1;
         }
         if(btn_pressed(b, 1)) {
             control_message.brightness = max(14, control_message.brightness - 1);
-            send_it = true;
+            presses += 1;
         }
 
-        if(send_it) {
+        if(btn_pressed(b, 2)) {
+            presses += 1;
+        }
+
+        if(held == 2) {
+            if(repeats == 0) {
+                char const msg[] = "both\0\0p";
+                memcpy(text_message.msg, msg, sizeof(msg) - 1);
+                text_message.seconds = 4;
+                text_messenger.send_message(text_message);
+            }
+        } else if(presses == 1 && releases == 0) {
             control_messenger.send_message(control_message);
         }
     }
@@ -98,6 +127,7 @@ extern "C" void app_main()
 
     control_messenger.init(control_message);
     clock_messenger.init(clock_message);
+    text_messenger.init(text_message);
 
     messenger::start();
 

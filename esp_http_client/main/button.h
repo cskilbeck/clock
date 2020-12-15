@@ -23,3 +23,8 @@ static bool btn_released(uint32 button_events, int button_id)
 {
     return ((button_events >> (button_id * 4)) & 4) != 0;
 }
+
+static bool btn_repeat(uint32 button_events, int button_id)
+{
+    return ((button_events >> (button_id * 4)) & 8) != 0;
+}
