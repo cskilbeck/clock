@@ -89,6 +89,15 @@ struct button
 };
 
 //////////////////////////////////////////////////////////////////////
+
+static uint32 read_gpio_inputs()
+{
+    uint32 gpio = GPIO.in;
+    uint32 pin16 = READ_PERI_REG(RTC_GPIO_IN_DATA) & 1;
+    return (gpio & 0xffff) | (pin16 << 16);
+}
+
+//////////////////////////////////////////////////////////////////////
 // turns out, if you're not too worried about latency/timing, polling
 // at 10ms intervals is a perfectly valid way to debounce even quite
 // crappy tactile switches
@@ -101,9 +110,7 @@ static void IRAM_ATTR button_task(void *)
 
     while(true) {
 
-        uint32 gpio = GPIO.in;
-        uint32 pin16 = READ_PERI_REG(RTC_GPIO_IN_DATA) & 1;
-        gpio = (gpio & 0xffff) | (pin16 << 16);
+        uint32 gpio = read_gpio_inputs();
 
         bool changed = false;
         for(int i = 0; i < NUM_BUTTONS; ++i) {
