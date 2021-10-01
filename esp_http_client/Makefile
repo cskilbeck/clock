@@ -5,7 +5,8 @@
 
 PROJECT_NAME := clock
 
-CFLAGS = -DSNTP_UPDATE_DELAY=180000
+CFLAGS = -Wno-deprecated-declarations
+CPPFLAGS = -Wno-deprecated-declarations
 
 include $(IDF_PATH)/make/project.mk
 

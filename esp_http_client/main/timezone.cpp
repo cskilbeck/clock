@@ -14,6 +14,8 @@
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_http_client.h"
+#include "lwip/inet.h"
+#include "lwip/ip4_addr.h"
 #include <time.h>
 
 #include "types.h"
@@ -24,6 +26,20 @@
 #include "timezone.h"
 
 static char const *TAG = "TIMEZONE";
+
+//////////////////////////////////////////////////////////////////////
+
+static int fi(float f)
+{
+    return (int)f;
+}
+
+static uint ff(float f)
+{
+    return (uint)std::abs(f * 100000.0f) % 100000;
+}
+
+#define FLOAT "%d.%05u"
 
 //////////////////////////////////////////////////////////////////////
 
@@ -67,7 +83,7 @@ enum
     key_lon
 };
 
-static char const timezone_api_url_fmt[] = "http://api.timezonedb.com/v2.1/get-time-zone?key=VV0F65261GPD&by=position&lat=%f&lng=%f&format=json";
+static char const timezone_api_url_fmt[] = "http://api.timezonedb.com/v2.1/get-time-zone?key=VV0F65261GPD&by=position&lat=" FLOAT "&lng=" FLOAT "&format=json";
 int const json_token_max = 128;
 static jsmntok_t tokens[json_token_max]; /* We expect no more than 128 tokens */
 static char url_buffer[countof(timezone_api_url_fmt) + 40];
@@ -80,7 +96,7 @@ static bool get_timezone(float lat, float lon)
     bool success = false;
 
     ESP_LOGI(TAG, "Update timezone");
-    int buffer_len = sprintf(url_buffer, timezone_api_url_fmt, lat, lon);
+    int buffer_len = sprintf(url_buffer, timezone_api_url_fmt, fi(lat), ff(lat), fi(lon), ff(lon));
     ESP_LOGV(TAG, "CLOCK WOULD USE %s (%d)", url_buffer, buffer_len);
 
     http h;
@@ -138,6 +154,7 @@ static bool get_timezone(float lat, float lon)
         setenv("TZ", tz_buffer, 1);
         tzset();
         ESP_LOGV(TAG, "TZ=%s", tz_buffer);
+
     } else {
         ESP_LOGW(TAG, "HUH? TZ not got");
         success = false;
@@ -207,7 +224,7 @@ static esp_err_t get_location(float *ip_lat_p, float *ip_lon_p)
         ESP_LOGE(TAG, "Error getting geo location: %02x", got_lat_lon);
         return ESP_ERR_NOT_FOUND;
     }
-    ESP_LOGI(TAG, "IP: %s, Lat: %f, Lon: %f", ip_addr, ip_lat, ip_lon);
+    ESP_LOGI(TAG, "IP: %s, Lat: " FLOAT ", Lon: " FLOAT, ip_addr, fi(ip_lat), ff(ip_lat), fi(ip_lon), ff(ip_lon));
     *ip_lat_p = ip_lat;
     *ip_lon_p = ip_lon;
     return ESP_OK;
@@ -215,20 +232,42 @@ static esp_err_t get_location(float *ip_lat_p, float *ip_lon_p)
 
 //////////////////////////////////////////////////////////////////////
 
-esp_err_t init_timezone()
+int timezone_offset()
+{
+    return gmt_offset;
+}
+
+
+//////////////////////////////////////////////////////////////////////
+
+void timezone_task(void *)
 {
     float ip_lat = 0;    // what we got from ip-api
     float ip_lon = 0;
 
+    // get ip address location
+
     while(get_location(&ip_lat, &ip_lon) != ESP_OK) {
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 
-    return get_timezone(ip_lat, ip_lon);
-}
+    do {
 
-//////////////////////////////////////////////////////////////////////
+        // get timezone for location
 
-int timezone_offset()
-{
-    return gmt_offset;
+        while(get_timezone(ip_lat, ip_lon) != ESP_OK) {
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+        }
+
+        // wait until 10 seconds after midnight
+
+        constexpr uint32 one_day = 24 * 60 * 60;
+        struct timespec t;
+        clock_gettime(CLOCK_REALTIME, &t);
+        struct tm tod;
+        uint32 daytime = (t.tv_sec + timezone_offset()) % one_day;
+        int when_to_wake = t.tv_sec + (one_day - daytime) + 10;
+        vTaskDelay((when_to_wake * 1000) / portTICK_PERIOD_MS - xTaskGetTickCount());
+
+    } while(true);
 }

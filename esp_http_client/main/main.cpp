@@ -5,18 +5,24 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <utility>
+#include <algorithm>
 #include <type_traits>
 #include <sys/timeb.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lwip/apps/sntp.h"
+#include "lwip/inet.h"
+#include "lwip/ip4_addr.h"
+#include "ping/ping.h"
+
 #include "freertos/event_groups.h"
 #include "nvs_flash.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "driver/gpio.h"
 #include "esp8266/gpio_struct.h"
+#include "esp_ping.h"
 
 #include "types.h"
 #include "util.h"
@@ -51,6 +57,82 @@ text_message_t text_message;
 messenger control_messenger;
 messenger clock_messenger;
 messenger text_messenger;
+
+//////////////////////////////////////////////////////////////////////
+
+EventGroupHandle_t ping_events;
+
+uint32 ping_count = 3;         // how many pings per report
+uint32 ping_timeout = 1000;    // mS till we consider it timed out
+uint32 ping_delay = 50;        // mS between pings
+
+bool pinging = false;
+
+//////////////////////////////////////////////////////////////////////
+
+esp_err_t on_ping_result(ping_target_id_t msgType, esp_ping_found *pf)
+{
+    char const *TAG = "PING";
+    if(pf->ping_err == PING_RES_FINISH) {
+        if(pf->err_count != 0 || pf->recv_count < pf->send_count) {
+            ESP_LOGW(TAG, "PING ERR: Sent:%d Rec:%d Err:%d min(mS):%d max(mS):%d ", pf->send_count, pf->recv_count, pf->err_count, pf->min_time, pf->max_time);
+            xEventGroupSetBits(ping_events, 4);
+        } else {
+            ESP_LOGI(TAG, "PING OK, max %d", pf->max_time);
+            xEventGroupSetBits(ping_events, 2);
+        }
+    }
+    return ESP_OK;
+}
+
+//////////////////////////////////////////////////////////////////////
+
+template <typename T, size_t N> void show_msg(T const (&msg)[N], int seconds = 4)
+{
+    size_t len = std::min(7u, N);
+    memcpy(text_message.msg, msg, len);
+    if(len < 7) {
+        memset(text_message.msg + len, 0, 7 - len);
+    }
+    text_message.seconds = seconds;
+    text_messenger.send_message(text_message);
+}
+
+//////////////////////////////////////////////////////////////////////
+
+void ping_task(void *)
+{
+    char const *TAG = "PING";
+
+    ESP_LOGI(TAG, "Ready and waiting...");
+
+    while(true) {
+        uint x = xEventGroupWaitBits(ping_events, 7, true, false, portMAX_DELAY);
+        if((x & 2) != 0) {
+            pinging = false;
+            show_msg("pingyes");
+        }
+        if((x & 4) != 0) {
+            pinging = false;
+            show_msg("pingerr");
+        }
+        if((x & 1) != 0) {
+            if(!pinging) {
+                pinging = true;
+                esp_ping_set_target(PING_TARGET_IP_ADDRESS_COUNT, &ping_count, sizeof(uint32_t));
+                esp_ping_set_target(PING_TARGET_RCV_TIMEO, &ping_timeout, sizeof(uint32_t));
+                esp_ping_set_target(PING_TARGET_DELAY_TIME, &ping_delay, sizeof(uint32_t));
+                esp_ping_set_target(PING_TARGET_IP_ADDRESS, &wifi::gateway.addr, sizeof(uint32_t));
+                esp_ping_set_target(PING_TARGET_RES_FN, (void *)on_ping_result, sizeof(&on_ping_result));
+                ping_init();
+                show_msg("ping\0\0\0");
+            } else {
+                ESP_LOGI(TAG, "Hold your horses!");
+                show_msg("not\0yet");
+            }
+        }
+    }
+}
 
 //////////////////////////////////////////////////////////////////////
 
@@ -94,14 +176,10 @@ void menu_task(void *)
 
         if(btn_pressed(b, 2)) {
             presses += 1;
-        }
-
-        if(held == 2) {
+            xEventGroupSetBits(ping_events, 1);
+        } else if(held == 2) {
             if(repeats == 0) {
-                char const msg[] = "both\0\0p";
-                memcpy(text_message.msg, msg, sizeof(msg) - 1);
-                text_message.seconds = 4;
-                text_messenger.send_message(text_message);
+                show_msg("both\0\0p");
             }
         } else if(presses == 1 && releases == 0) {
             control_messenger.send_message(control_message);
@@ -131,6 +209,9 @@ extern "C" void app_main()
 
     messenger::start();
 
+    ping_events = xEventGroupCreate();
+    xTaskCreate(ping_task, "ping_task", 2048, null, 5, null);
+
     button_init();
 
     xTaskCreate(menu_task, "menu_task", 2048, null, 5, null);
@@ -138,13 +219,10 @@ extern "C" void app_main()
     // this current task becomes the clock task which sends clock_message_t messages
 
     // first switch on the wifi
-    initialise_wifi();
-    wifi_wait_until(wifi_event_connected, portMAX_DELAY);
+    wifi::init();
+    wifi::wait_until(wifi::CONNECTED, portMAX_DELAY);
 
-    // get timezone from web service
-    if(init_timezone() != ESP_OK) {
-        ESP_LOGE(TAG, "Can't get IP/Location/Timezone");
-    }
+    xTaskCreate(timezone_task, "timezone_task", 2048, null, 5, null);
 
     // start sntp client
     start_sntp();
